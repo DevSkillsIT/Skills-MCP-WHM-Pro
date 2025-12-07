@@ -645,7 +645,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 ### Developed By
 
 **Skills IT - Soluções em Tecnologia**
-- Website: [https://skills-it.com.br](https://skills-it.com.br)
+- Website: [https://www.skillsit.com.br](https://www.skillsit.com.br)
 - Email: contato@DevSkillsIT.com.br
 - GitHub: [@DevSkillsIT](https://github.com/skills-it)
 

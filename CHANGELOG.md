@@ -156,5 +156,5 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ---
 
 **Skills IT - Soluções em Tecnologia**
-contato@skills-it.com.br
-https://skills-it.com.br
+contato@skillsit.com.br
+https://www.skillsit.com.br
