@@ -1,0 +1,524 @@
+{
+  "version": "1.0.0",
+  "name": "skills-mcp-whm-pro",
+  "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, and monitoring capabilities",
+  "tools": [
+    {
+      "name": "whm.list_accounts",
+      "description": "List all cPanel accounts on the WHM server with detailed information including disk usage, bandwidth, and status",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "category": "WHM Account Management",
+      "security": "read-only"
+    },
+    {
+      "name": "whm.create_account",
+      "description": "Create a new cPanel account with specified domain, username, password, and hosting package",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "cPanel username (alphanumeric, max 16 chars)",
+            "pattern": "^[a-z0-9]{1,16}$"
+          },
+          "domain": {
+            "type": "string",
+            "description": "Primary domain for the account",
+            "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
+          },
+          "password": {
+            "type": "string",
+            "description": "Account password (min 8 chars, recommended strong password)"
+          },
+          "email": {
+            "type": "string",
+            "description": "Contact email address",
+            "format": "email"
+          },
+          "package": {
+            "type": "string",
+            "description": "Hosting package name (optional, defaults to 'default')"
+          }
+        },
+        "required": ["username", "domain", "password"]
+      },
+      "category": "WHM Account Management",
+      "security": "write"
+    },
+    {
+      "name": "whm.suspend_account",
+      "description": "Suspend a cPanel account and prevent access. Useful for policy violations or non-payment",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "cPanel username to suspend"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for suspension (logged for audit)"
+          }
+        },
+        "required": ["username", "reason"]
+      },
+      "category": "WHM Account Management",
+      "security": "write"
+    },
+    {
+      "name": "whm.unsuspend_account",
+      "description": "Unsuspend a previously suspended cPanel account and restore access",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "cPanel username to unsuspend"
+          }
+        },
+        "required": ["username"]
+      },
+      "category": "WHM Account Management",
+      "security": "write"
+    },
+    {
+      "name": "whm.terminate_account",
+      "description": "Permanently delete a cPanel account and all associated data. This action is IRREVERSIBLE. Requires confirmationToken.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "cPanel username to terminate"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token matching MCP_SAFETY_TOKEN environment variable"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for termination (logged for audit)"
+          }
+        },
+        "required": ["username", "confirmationToken", "reason"]
+      },
+      "category": "WHM Account Management",
+      "security": "destructive"
+    },
+    {
+      "name": "whm.get_account_summary",
+      "description": "Get detailed information about a specific cPanel account including usage statistics and configuration",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "username": {
+            "type": "string",
+            "description": "cPanel username to query"
+          }
+        },
+        "required": ["username"]
+      },
+      "category": "WHM Account Management",
+      "security": "read-only"
+    },
+    {
+      "name": "whm.server_status",
+      "description": "Get comprehensive server status including uptime, load average, memory usage, and service health",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "category": "WHM Monitoring",
+      "security": "read-only"
+    },
+    {
+      "name": "whm.service_status",
+      "description": "Check the status of a specific service (httpd, mysql, named, etc.)",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service name to check",
+            "enum": ["httpd", "mysql", "named", "postfix", "dovecot", "exim", "nginx", "pure-ftpd"]
+          }
+        },
+        "required": ["service"]
+      },
+      "category": "WHM Monitoring",
+      "security": "read-only"
+    },
+    {
+      "name": "whm.restart_service",
+      "description": "Restart a system service. Requires confirmationToken for safety.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service name to restart",
+            "enum": ["httpd", "mysql", "named", "postfix", "dovecot", "exim", "nginx", "pure-ftpd"]
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token matching MCP_SAFETY_TOKEN"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for restart (logged)"
+          }
+        },
+        "required": ["service", "confirmationToken", "reason"]
+      },
+      "category": "WHM System Management",
+      "security": "write"
+    },
+    {
+      "name": "whm.list_domains",
+      "description": "List all domains across all cPanel accounts on the server",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "category": "WHM Account Management",
+      "security": "read-only"
+    },
+    {
+      "name": "dns.list_zones",
+      "description": "List all DNS zones managed by the WHM server with zone status and record counts",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "category": "DNS Management",
+      "security": "read-only"
+    },
+    {
+      "name": "dns.get_zone",
+      "description": "Get complete DNS zone records for a specific domain including A, AAAA, CNAME, MX, TXT, NS records",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Domain name (zone) to retrieve"
+          }
+        },
+        "required": ["zone"]
+      },
+      "category": "DNS Management",
+      "security": "read-only"
+    },
+    {
+      "name": "dns.add_record",
+      "description": "Add a new DNS record to a zone. Supports A, AAAA, CNAME, MX, TXT, NS, PTR record types",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Domain name (zone)"
+          },
+          "name": {
+            "type": "string",
+            "description": "Record name (hostname)"
+          },
+          "type": {
+            "type": "string",
+            "description": "DNS record type",
+            "enum": ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "PTR"]
+          },
+          "address": {
+            "type": "string",
+            "description": "IP address (for A/AAAA records)"
+          },
+          "cname": {
+            "type": "string",
+            "description": "Target hostname (for CNAME records)"
+          },
+          "exchange": {
+            "type": "string",
+            "description": "Mail server hostname (for MX records)"
+          },
+          "preference": {
+            "type": "number",
+            "description": "MX priority (lower = higher priority)"
+          },
+          "txtdata": {
+            "type": "string",
+            "description": "Text data (for TXT records)"
+          },
+          "ttl": {
+            "type": "number",
+            "description": "Time to live in seconds (default: 14400)"
+          }
+        },
+        "required": ["zone", "name", "type"]
+      },
+      "category": "DNS Management",
+      "security": "write"
+    },
+    {
+      "name": "dns.edit_record",
+      "description": "Edit an existing DNS record with optimistic locking to prevent race conditions. Requires expected_content for safety.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Domain name (zone)"
+          },
+          "line": {
+            "type": "number",
+            "description": "Line number of record to edit (from dns.get_zone)"
+          },
+          "expected_content": {
+            "type": "string",
+            "description": "Current record content for optimistic locking"
+          },
+          "new_content": {
+            "type": "string",
+            "description": "New record content"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token for destructive operation"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for change (logged)"
+          }
+        },
+        "required": ["zone", "line", "expected_content", "new_content", "confirmationToken", "reason"]
+      },
+      "category": "DNS Management",
+      "security": "write"
+    },
+    {
+      "name": "dns.delete_record",
+      "description": "Delete a DNS record from a zone. Requires confirmationToken.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Domain name (zone)"
+          },
+          "line": {
+            "type": "number",
+            "description": "Line number of record to delete"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for deletion (logged)"
+          }
+        },
+        "required": ["zone", "line", "confirmationToken", "reason"]
+      },
+      "category": "DNS Management",
+      "security": "destructive"
+    },
+    {
+      "name": "dns.reset_zone",
+      "description": "Reset DNS zone to default records. Destructive operation requiring confirmationToken.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": {
+            "type": "string",
+            "description": "Domain name (zone) to reset"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for reset (logged)"
+          }
+        },
+        "required": ["zone", "confirmationToken", "reason"]
+      },
+      "category": "DNS Management",
+      "security": "destructive"
+    },
+    {
+      "name": "system.restart_service",
+      "description": "Restart a system service from the allowlist. Safer alternative to arbitrary SSH commands.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "service": {
+            "type": "string",
+            "description": "Service name from allowlist"
+          }
+        },
+        "required": ["service"]
+      },
+      "category": "System Management",
+      "security": "write"
+    },
+    {
+      "name": "system.get_load",
+      "description": "Get server load averages (1min, 5min, 15min), memory usage, disk usage, and uptime",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      },
+      "category": "System Management",
+      "security": "read-only"
+    },
+    {
+      "name": "log.read_last_lines",
+      "description": "Read last N lines from a whitelisted log file. Access restricted to /var/log/* and /usr/local/cpanel/logs/*",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "logfile": {
+            "type": "string",
+            "description": "Log file path (must be in whitelist)"
+          },
+          "lines": {
+            "type": "number",
+            "description": "Number of lines to read (max: 1000)",
+            "minimum": 1,
+            "maximum": 1000,
+            "default": 50
+          }
+        },
+        "required": ["logfile"]
+      },
+      "category": "Log Management",
+      "security": "read-only"
+    },
+    {
+      "name": "file.list",
+      "description": "List files and directories in a cPanel account's directory. Path validation ensures access only within /home/{username}",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cpanel_user": {
+            "type": "string",
+            "description": "cPanel username"
+          },
+          "path": {
+            "type": "string",
+            "description": "Directory path (relative to /home/{username})"
+          }
+        },
+        "required": ["cpanel_user"]
+      },
+      "category": "File Management",
+      "security": "read-only"
+    },
+    {
+      "name": "file.read",
+      "description": "Read content of a file within a cPanel account's directory. Path validation enforced.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cpanel_user": {
+            "type": "string",
+            "description": "cPanel username"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "File path (relative to /home/{username})"
+          }
+        },
+        "required": ["cpanel_user", "file_path"]
+      },
+      "category": "File Management",
+      "security": "read-only"
+    },
+    {
+      "name": "file.write",
+      "description": "Write content to a file in a cPanel account. Creates automatic backup before overwrite. Requires confirmationToken.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cpanel_user": {
+            "type": "string",
+            "description": "cPanel username"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "File path (relative to /home/{username})"
+          },
+          "content": {
+            "type": "string",
+            "description": "File content to write"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for write (logged)"
+          }
+        },
+        "required": ["cpanel_user", "file_path", "content", "confirmationToken", "reason"]
+      },
+      "category": "File Management",
+      "security": "write"
+    },
+    {
+      "name": "file.delete",
+      "description": "Delete a file from a cPanel account. Requires confirmationToken for safety.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "cpanel_user": {
+            "type": "string",
+            "description": "cPanel username"
+          },
+          "file_path": {
+            "type": "string",
+            "description": "File path to delete"
+          },
+          "confirmationToken": {
+            "type": "string",
+            "description": "Safety token"
+          },
+          "reason": {
+            "type": "string",
+            "description": "Reason for deletion (logged)"
+          }
+        },
+        "required": ["cpanel_user", "file_path", "confirmationToken", "reason"]
+      },
+      "category": "File Management",
+      "security": "destructive"
+    }
+  ],
+  "security_levels": {
+    "read-only": "Safe operations that only retrieve information",
+    "write": "Operations that modify configuration or data",
+    "destructive": "Dangerous operations that delete data or reset configurations. Require confirmationToken."
+  },
+  "features": [
+    "Enterprise-grade security with API Key authentication",
+    "Advanced DNS management with optimistic locking",
+    "Safety Guard system preventing accidental data loss",
+    "Prometheus metrics for production monitoring",
+    "Exponential backoff retry logic for resilience",
+    "Configurable timeouts via environment variables",
+    "Automatic credential sanitization in logs",
+    "Path validation preventing directory traversal",
+    "SSH operation allowlist (no RCE vulnerabilities)",
+    "Automatic file backups before overwrite"
+  ]
+}

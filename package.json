@@ -1,0 +1,91 @@
+{
+  "name": "skills-mcp-whm-pro",
+  "version": "1.0.0",
+  "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, and monitoring capabilities. Features include API Key authentication, DNS optimistic locking, Safety Guard, Prometheus metrics, and comprehensive toolset (23 tools).",
+  "main": "src/server.js",
+  "bin": {
+    "skills-whm-mcp": "bin/cli.js"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "jest --coverage",
+    "test:watch": "jest --watch",
+    "test:ci": "jest --coverage --ci --reporters=default --reporters=jest-junit",
+    "introspect": "node bin/cli.js introspect",
+    "describe-tools": "node bin/cli.js describe-tools"
+  },
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "model-context-protocol",
+    "whm",
+    "cpanel",
+    "web-hosting",
+    "dns-management",
+    "server-management",
+    "hosting-automation",
+    "ai",
+    "claude",
+    "llm",
+    "devops",
+    "sysadmin",
+    "hosting-provider",
+    "msp",
+    "managed-services",
+    "prometheus",
+    "monitoring",
+    "security"
+  ],
+  "author": {
+    "name": "Skills IT - Soluções em Tecnologia",
+    "email": "contato@skills-it.com.br",
+    "url": "https://skills-it.com.br"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DevSkillsIT/skills-mcp-whm-pro"
+  },
+  "bugs": {
+    "url": "https://github.com/DevSkillsIT/skills-mcp-whm-pro/issues"
+  },
+  "homepage": "https://github.com/DevSkillsIT/skills-mcp-whm-pro#readme",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "ssh2": "^1.14.0",
+    "dotenv": "^16.3.0",
+    "winston": "^3.11.0",
+    "prom-client": "^15.1.0",
+    "zod": "^3.22.0",
+    "axios": "^1.6.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "jest": "^29.7.0",
+    "supertest": "^6.3.0"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "testMatch": ["**/tests/**/*.test.js"],
+    "collectCoverageFrom": [
+      "src/**/*.js",
+      "!src/**/*.test.js"
+    ],
+    "coverageDirectory": "coverage",
+    "coverageReporters": ["text", "lcov", "html"],
+    "coverageThreshold": {
+      "global": {
+        "branches": 20,
+        "functions": 25,
+        "lines": 25,
+        "statements": 25
+      }
+    },
+    "verbose": true
+  }
+}

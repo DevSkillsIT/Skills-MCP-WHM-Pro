@@ -1,0 +1,26 @@
+{
+  "mcpServers": {
+    "skills-whm-pro": {
+      "command": "node",
+      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
+      "env": {
+        "WHM_HOST": "https://seu-servidor-whm.com:2087",
+        "WHM_API_TOKEN": "seu-token-api-whm",
+        "MCP_PORT": "3100",
+        "MCP_SAFETY_TOKEN": "seu-token-seguranca-opcional",
+        "WHM_TIMEOUT": "30000",
+        "RETRY_MAX_ATTEMPTS": "3",
+        "RETRY_INITIAL_DELAY": "1000",
+        "NODE_ENV": "production"
+      }
+    }
+  },
+  "globalShortcut": "CommandOrControl+Shift+M",
+  "anthropic": {
+    "apiKey": "sua-api-key-anthropic"
+  },
+  "ui": {
+    "theme": "dark",
+    "fontSize": 14
+  }
+}

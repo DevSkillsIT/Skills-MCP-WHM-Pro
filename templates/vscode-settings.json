@@ -1,0 +1,37 @@
+{
+  "mcp.servers": {
+    "skills-whm-pro": {
+      "command": "node",
+      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
+      "env": {
+        "WHM_HOST": "https://seu-servidor-whm.com:2087",
+        "WHM_API_TOKEN": "seu-token-api-whm",
+        "MCP_PORT": "3100",
+        "MCP_SAFETY_TOKEN": "seu-token-seguranca-opcional"
+      },
+      "description": "Skills MCP WHM Pro - Enterprise WHM/cPanel Management",
+      "capabilities": {
+        "tools": true,
+        "resources": false,
+        "prompts": false
+      }
+    }
+  },
+  "mcp.mcpServers": {
+    "skills-whm-pro": {
+      "url": "http://localhost:3100/mcp",
+      "name": "Skills WHM Pro",
+      "description": "WHM/cPanel management with 23 advanced tools"
+    }
+  },
+  "files.associations": {
+    "*.whm": "json",
+    "ad-config.json": "jsonc"
+  },
+  "json.schemas": [
+    {
+      "fileMatch": ["schemas/mcp-tools.json"],
+      "url": "./schemas/mcp-tools.json"
+    }
+  ]
+}

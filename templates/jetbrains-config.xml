@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component name="MCPConfiguration">
+  <mcpServers>
+    <server>
+      <name>skills-whm-pro</name>
+      <displayName>Skills MCP WHM Pro</displayName>
+      <description>Enterprise-grade MCP Server for WHM/cPanel management with 23 advanced tools</description>
+      <version>1.0.0</version>
+
+      <command>node</command>
+      <args>
+        <arg>/opt/mcp-servers/whm-cpanel/src/server.js</arg>
+      </args>
+
+      <environment>
+        <variable name="WHM_HOST" value="https://seu-servidor-whm.com:2087"/>
+        <variable name="WHM_API_TOKEN" value="seu-token-api-whm"/>
+        <variable name="MCP_PORT" value="3100"/>
+        <variable name="MCP_SAFETY_TOKEN" value="seu-token-seguranca-opcional"/>
+        <variable name="WHM_TIMEOUT" value="30000"/>
+        <variable name="RETRY_MAX_ATTEMPTS" value="3"/>
+        <variable name="RETRY_INITIAL_DELAY" value="1000"/>
+        <variable name="NODE_ENV" value="production"/>
+      </environment>
+
+      <capabilities>
+        <tools>true</tools>
+        <resources>false</resources>
+        <prompts>false</prompts>
+        <logging>true</logging>
+      </capabilities>
+
+      <metadata>
+        <author>Skills IT - Soluções em Tecnologia</author>
+        <homepage>https://github.com/skills-it/skills-mcp-whm-pro</homepage>
+        <repository>https://github.com/skills-it/skills-mcp-whm-pro</repository>
+        <license>MIT</license>
+      </metadata>
+
+      <features>
+        <feature>Advanced DNS management with optimistic locking</feature>
+        <feature>Safety Guard system preventing accidental data loss</feature>
+        <feature>Prometheus metrics for production monitoring</feature>
+        <feature>Exponential backoff retry logic for resilience</feature>
+        <feature>Configurable timeouts via environment variables</feature>
+        <feature>Automatic credential sanitization in logs</feature>
+        <feature>Path validation preventing directory traversal</feature>
+        <feature>SSH operation allowlist (no RCE vulnerabilities)</feature>
+        <feature>Automatic file backups before overwrite</feature>
+      </features>
+
+      <toolCategories>
+        <category name="WHM Account Management" count="6"/>
+        <category name="DNS Management" count="6"/>
+        <category name="WHM Monitoring" count="2"/>
+        <category name="WHM System Management" count="1"/>
+        <category name="System Management" count="2"/>
+        <category name="Log Management" count="1"/>
+        <category name="File Management" count="4"/>
+      </toolCategories>
+
+      <autoStart>true</autoStart>
+      <enabled>true</enabled>
+    </server>
+  </mcpServers>
+
+  <settings>
+    <logLevel>INFO</logLevel>
+    <timeout>30000</timeout>
+    <retryEnabled>true</retryEnabled>
+  </settings>
+</component>

@@ -1,0 +1,363 @@
+{
+  "version": "1.0.0",
+  "examples": [
+    {
+      "category": "Account Management",
+      "title": "List all cPanel accounts",
+      "prompt": "List all cPanel accounts on the WHM server",
+      "tool": "whm.list_accounts",
+      "expected_output": "Array of accounts with username, domain, disk usage, and status"
+    },
+    {
+      "category": "Account Management",
+      "title": "Create new cPanel account",
+      "prompt": "Create a new cPanel account for domain 'newclient.com' with username 'newclient' and a strong password",
+      "tool": "whm.create_account",
+      "parameters": {
+        "username": "newclient",
+        "domain": "newclient.com",
+        "password": "SecurePass123!",
+        "email": "admin@newclient.com"
+      },
+      "expected_output": "Success confirmation with new account details"
+    },
+    {
+      "category": "Account Management",
+      "title": "Suspend account for non-payment",
+      "prompt": "Suspend the account 'badclient' due to non-payment",
+      "tool": "whm.suspend_account",
+      "parameters": {
+        "username": "badclient",
+        "reason": "Non-payment - invoice 30 days overdue"
+      },
+      "expected_output": "Success confirmation - account suspended"
+    },
+    {
+      "category": "DNS Management",
+      "title": "List all DNS zones",
+      "prompt": "Show me all DNS zones on this server",
+      "tool": "dns.list_zones",
+      "expected_output": "List of zones with domain names and record counts"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Get DNS records for domain",
+      "prompt": "Show all DNS records for example.com",
+      "tool": "dns.get_zone",
+      "parameters": {
+        "zone": "example.com"
+      },
+      "expected_output": "Complete DNS zone file with all A, AAAA, CNAME, MX, TXT records"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Add A record",
+      "prompt": "Add an A record for www.example.com pointing to 192.0.2.1",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "www",
+        "type": "A",
+        "address": "192.0.2.1",
+        "ttl": 14400
+      },
+      "expected_output": "Success - DNS record added"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Add MX record",
+      "prompt": "Add MX record for example.com pointing to mail.example.com with priority 10",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "@",
+        "type": "MX",
+        "exchange": "mail.example.com",
+        "preference": 10,
+        "ttl": 14400
+      },
+      "expected_output": "Success - MX record added"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Add TXT record for SPF",
+      "prompt": "Add SPF record for example.com",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "@",
+        "type": "TXT",
+        "txtdata": "v=spf1 mx a ip4:192.0.2.1 ~all",
+        "ttl": 14400
+      },
+      "expected_output": "Success - TXT record added"
+    },
+    {
+      "category": "Monitoring",
+      "title": "Check server status",
+      "prompt": "What is the current server status?",
+      "tool": "whm.server_status",
+      "expected_output": "Server uptime, load average, memory usage, disk usage"
+    },
+    {
+      "category": "Monitoring",
+      "title": "Check service health",
+      "prompt": "Is Apache/httpd running?",
+      "tool": "whm.service_status",
+      "parameters": {
+        "service": "httpd"
+      },
+      "expected_output": "Service status: active/inactive"
+    },
+    {
+      "category": "Monitoring",
+      "title": "Get server load",
+      "prompt": "Show me the server load and memory usage",
+      "tool": "system.get_load",
+      "expected_output": "Load averages (1/5/15 min), memory usage, disk space, uptime"
+    },
+    {
+      "category": "File Management",
+      "title": "List files in account",
+      "prompt": "List files in the public_html directory for account 'example'",
+      "tool": "file.list",
+      "parameters": {
+        "cpanel_user": "example",
+        "path": "public_html"
+      },
+      "expected_output": "List of files and directories"
+    },
+    {
+      "category": "File Management",
+      "title": "Read .htaccess file",
+      "prompt": "Show me the contents of .htaccess for account 'example'",
+      "tool": "file.read",
+      "parameters": {
+        "cpanel_user": "example",
+        "file_path": "public_html/.htaccess"
+      },
+      "expected_output": "File contents"
+    },
+    {
+      "category": "Log Analysis",
+      "title": "Check Apache error log",
+      "prompt": "Show me the last 100 lines of the Apache error log",
+      "tool": "log.read_last_lines",
+      "parameters": {
+        "logfile": "/var/log/httpd/error_log",
+        "lines": 100
+      },
+      "expected_output": "Last 100 lines of error log"
+    },
+    {
+      "category": "Daily Operations",
+      "title": "Morning server health check",
+      "prompt": "Give me a morning health check: server status, load, and any recent errors",
+      "workflow": [
+        "whm.server_status",
+        "system.get_load",
+        "log.read_last_lines (error logs)"
+      ],
+      "expected_output": "Comprehensive health report"
+    },
+    {
+      "category": "Daily Operations",
+      "title": "New client onboarding",
+      "prompt": "Set up a new client: create account 'newco' for domain 'newcompany.com', add www A record pointing to server IP, and add MX records for mail",
+      "workflow": [
+        "whm.create_account",
+        "dns.add_record (www A)",
+        "dns.add_record (MX)"
+      ],
+      "expected_output": "Complete new account setup"
+    },
+    {
+      "category": "Daily Operations",
+      "title": "Suspend non-paying client",
+      "prompt": "Client 'badpayer' hasn't paid for 30 days - suspend their account and document the reason",
+      "workflow": [
+        "whm.suspend_account"
+      ],
+      "expected_output": "Account suspended with audit trail"
+    },
+    {
+      "category": "Troubleshooting",
+      "title": "Investigate email delivery issues",
+      "prompt": "Client reports emails not being delivered - check DNS MX records for clientdomain.com and exim mail logs",
+      "workflow": [
+        "dns.get_zone",
+        "log.read_last_lines (/var/log/exim_mainlog)"
+      ],
+      "expected_output": "DNS records + mail log analysis"
+    },
+    {
+      "category": "Troubleshooting",
+      "title": "Website not loading",
+      "prompt": "Client's website example.com is not loading - check DNS A records, Apache status, and error logs",
+      "workflow": [
+        "dns.get_zone",
+        "whm.service_status (httpd)",
+        "log.read_last_lines (/var/log/httpd/error_log)"
+      ],
+      "expected_output": "Complete diagnostic report"
+    },
+    {
+      "category": "Account Management",
+      "title": "Bulk account creation for reseller",
+      "prompt": "Create 5 cPanel accounts for reseller packages: client1.com through client5.com",
+      "tool": "whm.create_account",
+      "expected_output": "Multiple account creation confirmations"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Setup DKIM record",
+      "prompt": "Add DKIM TXT record for mail._domainkey.example.com",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "mail._domainkey",
+        "type": "TXT",
+        "txtdata": "v=DKIM1; k=rsa; p=MIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQ...",
+        "ttl": 14400
+      },
+      "expected_output": "DKIM record added successfully"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Add DMARC policy",
+      "prompt": "Add DMARC policy for example.com with quarantine mode",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "_dmarc",
+        "type": "TXT",
+        "txtdata": "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com",
+        "ttl": 14400
+      },
+      "expected_output": "DMARC record added"
+    },
+    {
+      "category": "DNS Management",
+      "title": "Setup subdomain A record",
+      "prompt": "Point blog.example.com to 192.0.2.50",
+      "tool": "dns.add_record",
+      "parameters": {
+        "zone": "example.com",
+        "name": "blog",
+        "type": "A",
+        "address": "192.0.2.50",
+        "ttl": 3600
+      },
+      "expected_output": "Subdomain A record created"
+    },
+    {
+      "category": "Monitoring",
+      "title": "Check MySQL service health",
+      "prompt": "Is MySQL running properly?",
+      "tool": "whm.service_status",
+      "parameters": {
+        "service": "mysql"
+      },
+      "expected_output": "MySQL service status and uptime"
+    },
+    {
+      "category": "File Management",
+      "title": "Backup .htaccess before changes",
+      "prompt": "Read current .htaccess for account example before modifying",
+      "tool": "file.read",
+      "parameters": {
+        "cpanel_user": "example",
+        "file_path": "public_html/.htaccess"
+      },
+      "expected_output": "Current .htaccess content"
+    },
+    {
+      "category": "Daily Operations",
+      "title": "End of day account audit",
+      "prompt": "Show all suspended accounts and disk usage summary",
+      "workflow": [
+        "whm.list_accounts"
+      ],
+      "expected_output": "Account status report with disk metrics"
+    },
+    {
+      "category": "Troubleshooting",
+      "title": "High server load investigation",
+      "prompt": "Server load is high - check load average, top processes, and MySQL status",
+      "workflow": [
+        "system.get_load",
+        "whm.service_status (mysql)",
+        "log.read_last_lines (/var/log/messages)"
+      ],
+      "expected_output": "Performance diagnostic report"
+    },
+    {
+      "category": "Troubleshooting",
+      "title": "SSL certificate issue",
+      "prompt": "Client reports SSL errors on example.com - check HTTPS access and certificate",
+      "workflow": [
+        "dns.get_zone",
+        "log.read_last_lines (/var/log/httpd/ssl_error_log)"
+      ],
+      "expected_output": "SSL diagnostic information"
+    },
+    {
+      "category": "Security",
+      "title": "Audit recent account changes",
+      "prompt": "List all accounts created or modified in the last 24 hours",
+      "tool": "whm.list_accounts",
+      "expected_output": "Recent account activity report"
+    },
+    {
+      "category": "Security",
+      "title": "Review failed login attempts",
+      "prompt": "Check secure log for failed SSH and cPanel login attempts",
+      "tool": "log.read_last_lines",
+      "parameters": {
+        "logfile": "/var/log/secure",
+        "lines": 200
+      },
+      "expected_output": "Security event log"
+    },
+    {
+      "category": "Migration",
+      "title": "Prepare account for migration",
+      "prompt": "Get complete info for account migrationclient before moving to new server",
+      "tool": "whm.get_account_summary",
+      "parameters": {
+        "username": "migrationclient"
+      },
+      "expected_output": "Complete account configuration and statistics"
+    }
+  ],
+  "prompt_patterns": {
+    "account_operations": [
+      "Create account for {domain}",
+      "Suspend {username} because {reason}",
+      "Delete account {username}",
+      "Show me all accounts",
+      "Get details for account {username}"
+    ],
+    "dns_operations": [
+      "Add {type} record for {domain}",
+      "Show DNS records for {domain}",
+      "Update DNS for {domain}",
+      "Add MX records for {domain}",
+      "Set up SPF/DKIM for {domain}"
+    ],
+    "monitoring": [
+      "Check server status",
+      "Show server load",
+      "Is {service} running?",
+      "Show error logs",
+      "Health check report"
+    ],
+    "troubleshooting": [
+      "Why is {domain} not loading?",
+      "Check email configuration for {domain}",
+      "Investigate slow performance",
+      "Check disk space",
+      "Review error logs for {service}"
+    ]
+  }
+}

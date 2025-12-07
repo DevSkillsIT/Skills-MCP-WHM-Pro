@@ -1,0 +1,224 @@
+{
+  "api_version": "11.110",
+  "base_url": "https://{whm_host}:2087",
+  "authentication": {
+    "method": "API Token",
+    "header": "Authorization: whm root:{api_token}",
+    "security_note": "Never use HTTP - always HTTPS (port 2087)"
+  },
+  "endpoints": {
+    "account_management": {
+      "listaccts": {
+        "method": "GET",
+        "path": "/json-api/listaccts",
+        "description": "List all cPanel accounts",
+        "response_format": "JSON",
+        "example_response": {
+          "metadata": {
+            "result": 1,
+            "reason": "OK"
+          },
+          "data": {
+            "acct": [
+              {
+                "user": "example",
+                "domain": "example.com",
+                "email": "admin@example.com",
+                "diskused": "1024M",
+                "disklimit": "unlimited"
+              }
+            ]
+          }
+        }
+      },
+      "createacct": {
+        "method": "POST",
+        "path": "/json-api/createacct",
+        "description": "Create new cPanel account",
+        "parameters": {
+          "username": "string (required, max 16 alphanumeric)",
+          "domain": "string (required)",
+          "password": "string (required)",
+          "contactemail": "string (optional)",
+          "plan": "string (optional, defaults to 'default')"
+        },
+        "response_format": "JSON"
+      },
+      "suspendacct": {
+        "method": "POST",
+        "path": "/json-api/suspendacct",
+        "description": "Suspend cPanel account",
+        "parameters": {
+          "user": "string (required)",
+          "reason": "string (optional)"
+        }
+      },
+      "unsuspendacct": {
+        "method": "POST",
+        "path": "/json-api/unsuspendacct",
+        "description": "Unsuspend cPanel account",
+        "parameters": {
+          "user": "string (required)"
+        }
+      },
+      "removeacct": {
+        "method": "POST",
+        "path": "/json-api/removeacct",
+        "description": "Permanently delete cPanel account",
+        "parameters": {
+          "user": "string (required)",
+          "keepdns": "boolean (optional)"
+        },
+        "warning": "IRREVERSIBLE - All data will be permanently deleted"
+      },
+      "accountsummary": {
+        "method": "GET",
+        "path": "/json-api/accountsummary",
+        "description": "Get detailed account information",
+        "parameters": {
+          "user": "string (required)"
+        }
+      }
+    },
+    "dns_management": {
+      "listzones": {
+        "method": "GET",
+        "path": "/json-api/listzones",
+        "description": "List all DNS zones"
+      },
+      "dumpzone": {
+        "method": "GET",
+        "path": "/json-api/dumpzone",
+        "description": "Get all DNS records for a zone",
+        "parameters": {
+          "domain": "string (required)"
+        }
+      },
+      "addzonerecord": {
+        "method": "POST",
+        "path": "/json-api/addzonerecord",
+        "description": "Add DNS record to zone",
+        "parameters": {
+          "domain": "string (required)",
+          "name": "string (required)",
+          "type": "string (required: A, AAAA, CNAME, MX, TXT, etc)",
+          "address": "string (for A/AAAA)",
+          "cname": "string (for CNAME)",
+          "exchange": "string (for MX)",
+          "preference": "number (for MX)",
+          "txtdata": "string (for TXT)",
+          "ttl": "number (optional, default: 14400)"
+        }
+      },
+      "editzonerecord": {
+        "method": "POST",
+        "path": "/json-api/editzonerecord",
+        "description": "Edit existing DNS record",
+        "parameters": {
+          "domain": "string (required)",
+          "line": "number (required - line number from dumpzone)",
+          "class": "string (optional, default: IN)",
+          "ttl": "number (optional)",
+          "type": "string (optional)",
+          "address": "string (optional)",
+          "cname": "string (optional)"
+        },
+        "note": "Line-based editing due to WHM API limitations"
+      },
+      "removezonerecord": {
+        "method": "POST",
+        "path": "/json-api/removezonerecord",
+        "description": "Remove DNS record from zone",
+        "parameters": {
+          "zone": "string (required)",
+          "line": "number (required)"
+        }
+      },
+      "resetzone": {
+        "method": "POST",
+        "path": "/json-api/resetzone",
+        "description": "Reset DNS zone to defaults",
+        "parameters": {
+          "domain": "string (required)"
+        },
+        "warning": "Destroys all custom DNS records"
+      }
+    },
+    "server_management": {
+      "systemloadavg": {
+        "method": "GET",
+        "path": "/json-api/systemloadavg",
+        "description": "Get server load averages"
+      },
+      "servicestatus": {
+        "method": "GET",
+        "path": "/json-api/servicestatus",
+        "description": "Check service status",
+        "parameters": {
+          "service": "string (required)"
+        }
+      },
+      "restartservice": {
+        "method": "POST",
+        "path": "/json-api/restartservice",
+        "description": "Restart system service",
+        "parameters": {
+          "service": "string (required)"
+        }
+      }
+    },
+    "cpanel_uapi": {
+      "endpoint": "/json-api/cpanel",
+      "description": "Proxy to cPanel UAPI for per-account operations",
+      "parameters": {
+        "cpanel_jsonapi_user": "string (required - cPanel username)",
+        "cpanel_jsonapi_module": "string (required - UAPI module)",
+        "cpanel_jsonapi_func": "string (required - UAPI function)",
+        "cpanel_jsonapi_apiversion": "string (required - usually '2')"
+      },
+      "example": {
+        "module": "Fileman",
+        "function": "listfiles",
+        "description": "List files in account directory"
+      }
+    }
+  },
+  "response_format": {
+    "success": {
+      "metadata": {
+        "result": 1,
+        "reason": "OK"
+      },
+      "data": {}
+    },
+    "error": {
+      "metadata": {
+        "result": 0,
+        "reason": "Error message here"
+      },
+      "data": null
+    }
+  },
+  "rate_limiting": {
+    "recommended_approach": "Exponential backoff on 429 status",
+    "typical_limits": "100 requests/minute per IP",
+    "retry_after_header": "Respect Retry-After header when present"
+  },
+  "security_best_practices": [
+    "Always use HTTPS (port 2087)",
+    "Use API tokens instead of passwords",
+    "Implement retry logic with exponential backoff",
+    "Validate all input before sending to API",
+    "Never log API tokens or passwords",
+    "Use timeouts to prevent hanging requests",
+    "Implement rate limiting on client side"
+  ],
+  "common_errors": {
+    "401": "Unauthorized - Invalid API token",
+    "403": "Forbidden - Insufficient permissions",
+    "404": "Not Found - Account/resource doesn't exist",
+    "429": "Too Many Requests - Rate limit exceeded",
+    "500": "Internal Server Error - WHM server issue"
+  },
+  "documentation_url": "https://api.docs.cpanel.net/whm/introduction/"
+}

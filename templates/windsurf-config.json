@@ -1,0 +1,44 @@
+{
+  "mcpServers": {
+    "skills-whm-pro": {
+      "command": "node",
+      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
+      "env": {
+        "WHM_HOST": "https://seu-servidor-whm.com:2087",
+        "WHM_API_TOKEN": "seu-token-api-whm",
+        "MCP_PORT": "3100",
+        "MCP_SAFETY_TOKEN": "seu-token-seguranca-opcional",
+        "WHM_TIMEOUT": "30000",
+        "RETRY_MAX_ATTEMPTS": "3",
+        "RETRY_INITIAL_DELAY": "1000"
+      },
+      "metadata": {
+        "name": "Skills MCP WHM Pro",
+        "version": "1.0.0",
+        "description": "Enterprise-grade MCP Server for WHM/cPanel management with 23 tools",
+        "author": "Skills IT - Soluções em Tecnologia",
+        "homepage": "https://github.com/skills-it/skills-mcp-whm-pro"
+      },
+      "capabilities": {
+        "tools": true,
+        "resources": false,
+        "prompts": false,
+        "logging": true
+      },
+      "features": [
+        "Advanced DNS management with optimistic locking",
+        "Safety Guard system preventing accidental data loss",
+        "Configurable timeouts and retry logic",
+        "Path validation preventing directory traversal",
+        "Automatic file backups before overwrite"
+      ]
+    }
+  },
+  "settings": {
+    "mcp": {
+      "enabled": true,
+      "autoStart": true,
+      "logLevel": "info"
+    }
+  }
+}

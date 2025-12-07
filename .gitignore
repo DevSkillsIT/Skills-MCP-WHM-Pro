@@ -1,0 +1,48 @@
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+package-lock.json
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+logs/
+*.log
+_shared/logs/mcp-whm-cpanel-*.log
+
+# Backups
+/tmp/dns-backups/
+*.backup
+*.bak
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# CLI Generated Files
+skills-whm-mcp-*.json
+skills-whm-mcp-*.xml
+
+# MoAI/Skills IT Project Files (não incluir no repo do MCP WHM)
+CORRECOES_MOAI_*.md
+CORRECOES_REAUDITORIA_*.md
+QUALITY_GATE_REPORT.md
+quality_verification.xml
+Fluxo-Dev-SkillsIT/
+.moai/

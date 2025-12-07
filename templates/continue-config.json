@@ -1,0 +1,151 @@
+{
+  "models": [
+    {
+      "title": "Claude Opus 4",
+      "provider": "anthropic",
+      "model": "claude-opus-4",
+      "apiKey": "your-anthropic-api-key-here",
+      "contextLength": 200000,
+      "completionOptions": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    },
+    {
+      "title": "Claude Sonnet 3.5",
+      "provider": "anthropic",
+      "model": "claude-sonnet-3.5",
+      "apiKey": "your-anthropic-api-key-here",
+      "contextLength": 200000,
+      "completionOptions": {
+        "temperature": 0.3,
+        "maxTokens": 4096
+      }
+    }
+  ],
+  "mcpServers": {
+    "skills-whm-cpanel": {
+      "command": "node",
+      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
+      "env": {
+        "WHM_API_URL": "https://seu-servidor-whm.com:2087",
+        "WHM_API_TOKEN": "seu-token-whm-aqui",
+        "MCP_PORT": "3100",
+        "LOG_LEVEL": "info",
+        "ENABLE_METRICS": "true"
+      },
+      "disabled": false
+    }
+  },
+  "contextProviders": [
+    {
+      "name": "code",
+      "params": {}
+    },
+    {
+      "name": "docs",
+      "params": {}
+    },
+    {
+      "name": "diff",
+      "params": {}
+    },
+    {
+      "name": "terminal",
+      "params": {}
+    },
+    {
+      "name": "problems",
+      "params": {}
+    },
+    {
+      "name": "folder",
+      "params": {}
+    },
+    {
+      "name": "codebase",
+      "params": {}
+    }
+  ],
+  "slashCommands": [
+    {
+      "name": "whm-accounts",
+      "description": "List all cPanel accounts on WHM server",
+      "step": "Use the whm.list_accounts tool to retrieve all accounts"
+    },
+    {
+      "name": "whm-create",
+      "description": "Create a new cPanel account",
+      "step": "Use the whm.create_account tool with username, domain, and password"
+    },
+    {
+      "name": "whm-dns",
+      "description": "Manage DNS records (list zones, add/update/delete records)",
+      "step": "Use DNS tools: dns.list_zones, dns.get_zone, dns.add_record"
+    },
+    {
+      "name": "whm-status",
+      "description": "Check WHM server status and health",
+      "step": "Use whm.server_status and system.get_load tools"
+    },
+    {
+      "name": "whm-logs",
+      "description": "Read server logs (Apache, Exim, system)",
+      "step": "Use log.read_last_lines tool with appropriate log file path"
+    }
+  ],
+  "customCommands": [
+    {
+      "name": "whm-health-check",
+      "prompt": "Execute a complete health check of the WHM server: check server status, load average, disk usage, and list any suspended accounts. Format the output in a clear, readable way.",
+      "description": "Complete WHM server health check"
+    },
+    {
+      "name": "whm-onboard-client",
+      "prompt": "Help me onboard a new client to WHM: create cPanel account, set up DNS records (A and MX), and configure basic settings. Ask for domain, username, and email before proceeding.",
+      "description": "Automated client onboarding workflow"
+    },
+    {
+      "name": "whm-troubleshoot-email",
+      "prompt": "Troubleshoot email delivery issues: check MX records, verify mail server status, and read recent Exim logs. Ask for the domain to troubleshoot.",
+      "description": "Email delivery troubleshooting"
+    }
+  ],
+  "allowAnonymousTelemetry": false,
+  "docs": [
+    {
+      "title": "Skills MCP WHM Pro Documentation",
+      "startUrl": "https://github.com/DevSkillsIT/skills-mcp-whm-pro/blob/main/README.md"
+    },
+    {
+      "title": "WHM API Reference",
+      "startUrl": "https://github.com/DevSkillsIT/skills-mcp-whm-pro/blob/main/schemas/whm-api-reference.json"
+    },
+    {
+      "title": "MCP Tools Schema",
+      "startUrl": "https://github.com/DevSkillsIT/skills-mcp-whm-pro/blob/main/schemas/mcp-tools.json"
+    },
+    {
+      "title": "Usage Examples",
+      "startUrl": "https://github.com/DevSkillsIT/skills-mcp-whm-pro/blob/main/schemas/examples.json"
+    }
+  ],
+  "experimental": {
+    "modelRoles": {
+      "default": "Claude Sonnet 3.5",
+      "summarize": "Claude Sonnet 3.5"
+    }
+  },
+  "instructions": {
+    "pt-BR": "Configuração Continue.dev para Skills MCP WHM Pro\n\n=== INSTALAÇÃO ===\n\n1. Instale a extensão Continue no VS Code:\n   - Abra VS Code\n   - Pressione Ctrl/Cmd + Shift + X\n   - Busque por 'Continue'\n   - Clique em 'Install'\n\n2. Configure o MCP Server:\n   - Pressione Ctrl/Cmd + Shift + P\n   - Digite 'Continue: Open config.json'\n   - Cole este arquivo de configuração\n   - Ajuste as variáveis:\n     * WHM_API_URL: URL do seu servidor WHM\n     * WHM_API_TOKEN: Token de autenticação WHM\n     * apiKey: Sua chave da API Anthropic\n\n3. Recarregue VS Code:\n   - Pressione Ctrl/Cmd + Shift + P\n   - Digite 'Reload Window'\n\n=== USO ===\n\nComandos disponíveis (digite no chat Continue):\n\n1. Slash Commands:\n   /whm-accounts       - Listar contas cPanel\n   /whm-create         - Criar nova conta\n   /whm-dns            - Gerenciar DNS\n   /whm-status         - Status do servidor\n   /whm-logs           - Ler logs\n\n2. Custom Commands:\n   /whm-health-check       - Health check completo\n   /whm-onboard-client     - Onboarding automatizado\n   /whm-troubleshoot-email - Troubleshooting de email\n\n3. Comandos naturais:\n   - 'Listar todas as contas cPanel'\n   - 'Criar conta para dominio exemplo.com'\n   - 'Adicionar registro A para www.exemplo.com apontando para 192.0.2.1'\n   - 'Qual o status do servidor WHM?'\n   - 'Mostrar últimas 50 linhas do log do Apache'\n\n=== TOOLS DISPONÍVEIS (23) ===\n\nAccount Management:\n- whm.list_accounts, whm.create_account, whm.suspend_account\n- whm.unsuspend_account, whm.delete_account, whm.modify_account\n\nDNS Management:\n- dns.list_zones, dns.get_zone, dns.add_record\n- dns.delete_record, dns.update_record, dns.validate_zone\n\nMonitoring:\n- whm.server_status, whm.service_status, system.get_load\n\nFile Management:\n- file.list, file.read, file.write, file.delete\n\nLog Analysis:\n- log.read_last_lines\n\nSystem:\n- util.run_command, util.restart_service\n\n=== EXEMPLOS DE WORKFLOWS ===\n\n1. Onboarding de cliente:\n   'Criar conta para newclient.com, adicionar registros DNS (A e MX), e configurar email'\n\n2. Troubleshooting:\n   'Cliente relata que site não carrega - verificar DNS, status Apache, e logs de erro'\n\n3. Manutenção:\n   'Suspender conta badpayer por falta de pagamento, documentar razão'\n\n4. Monitoramento:\n   'Relatório de saúde: status servidor, carga, contas suspensas, espaço em disco'\n\n=== SEGURANÇA ===\n\n- Operações destrutivas requerem confirmationToken\n- Logs sanitizados automaticamente (sem credenciais)\n- Rate limiting em operações de massa\n- Validação de path para prevenir directory traversal\n\n=== SUPORTE ===\n\nDocumentação: https://github.com/DevSkillsIT/skills-mcp-whm-pro\nIssues: https://github.com/DevSkillsIT/skills-mcp-whm-pro/issues\nEmail: contato@skills-it.com.br",
+    "en": "Continue.dev Configuration for Skills MCP WHM Pro\n\n=== INSTALLATION ===\n\n1. Install Continue extension in VS Code:\n   - Open VS Code\n   - Press Ctrl/Cmd + Shift + X\n   - Search for 'Continue'\n   - Click 'Install'\n\n2. Configure MCP Server:\n   - Press Ctrl/Cmd + Shift + P\n   - Type 'Continue: Open config.json'\n   - Paste this configuration file\n   - Adjust variables:\n     * WHM_API_URL: Your WHM server URL\n     * WHM_API_TOKEN: WHM authentication token\n     * apiKey: Your Anthropic API key\n\n3. Reload VS Code:\n   - Press Ctrl/Cmd + Shift + P\n   - Type 'Reload Window'\n\n=== USAGE ===\n\nAvailable commands (type in Continue chat):\n\n1. Slash Commands:\n   /whm-accounts       - List cPanel accounts\n   /whm-create         - Create new account\n   /whm-dns            - Manage DNS\n   /whm-status         - Server status\n   /whm-logs           - Read logs\n\n2. Custom Commands:\n   /whm-health-check       - Complete health check\n   /whm-onboard-client     - Automated onboarding\n   /whm-troubleshoot-email - Email troubleshooting\n\n3. Natural commands:\n   - 'List all cPanel accounts'\n   - 'Create account for domain example.com'\n   - 'Add A record for www.example.com pointing to 192.0.2.1'\n   - 'What is the WHM server status?'\n   - 'Show last 50 lines of Apache log'\n\n=== AVAILABLE TOOLS (23) ===\n\nAccount Management:\n- whm.list_accounts, whm.create_account, whm.suspend_account\n- whm.unsuspend_account, whm.delete_account, whm.modify_account\n\nDNS Management:\n- dns.list_zones, dns.get_zone, dns.add_record\n- dns.delete_record, dns.update_record, dns.validate_zone\n\nMonitoring:\n- whm.server_status, whm.service_status, system.get_load\n\nFile Management:\n- file.list, file.read, file.write, file.delete\n\nLog Analysis:\n- log.read_last_lines\n\nSystem:\n- util.run_command, util.restart_service\n\n=== WORKFLOW EXAMPLES ===\n\n1. Client onboarding:\n   'Create account for newclient.com, add DNS records (A and MX), and configure email'\n\n2. Troubleshooting:\n   'Client reports site not loading - check DNS, Apache status, and error logs'\n\n3. Maintenance:\n   'Suspend account badpayer for non-payment, document reason'\n\n4. Monitoring:\n   'Health report: server status, load, suspended accounts, disk space'\n\n=== SECURITY ===\n\n- Destructive operations require confirmationToken\n- Logs automatically sanitized (no credentials)\n- Rate limiting on mass operations\n- Path validation to prevent directory traversal\n\n=== SUPPORT ===\n\nDocumentation: https://github.com/DevSkillsIT/skills-mcp-whm-pro\nIssues: https://github.com/DevSkillsIT/skills-mcp-whm-pro/issues\nEmail: contato@skills-it.com.br"
+  },
+  "metadata": {
+    "name": "Skills MCP WHM Pro",
+    "version": "1.0.0",
+    "author": "Skills IT - Soluções em Tecnologia",
+    "email": "contato@skills-it.com.br",
+    "repository": "https://github.com/DevSkillsIT/skills-mcp-whm-pro",
+    "license": "MIT"
+  }
+}

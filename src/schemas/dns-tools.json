@@ -1,0 +1,224 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DNS Tools Schema (CC-03)",
+  "description": "Schema canonico para ferramentas DNS do MCP WHM/cPanel",
+  "version": "1.0.0",
+
+  "definitions": {
+    "zone": {
+      "type": "string",
+      "description": "Nome da zona DNS (dominio)",
+      "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$",
+      "examples": ["example.com", "cliente1.com.br"]
+    },
+
+    "name": {
+      "type": "string",
+      "description": "Nome do registro (subdominio ou @)",
+      "pattern": "^(@|[a-zA-Z0-9_*]([a-zA-Z0-9_-]{0,61}[a-zA-Z0-9])?)$",
+      "examples": ["www", "api", "@", "*"]
+    },
+
+    "ttl": {
+      "type": "integer",
+      "description": "Time To Live em segundos",
+      "minimum": 60,
+      "maximum": 604800,
+      "default": 14400
+    },
+
+    "line": {
+      "type": "integer",
+      "description": "Numero da linha do registro na zona",
+      "minimum": 1
+    },
+
+    "recordType": {
+      "type": "string",
+      "description": "Tipo de registro DNS",
+      "enum": ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "PTR", "SOA", "SRV"]
+    },
+
+    "address": {
+      "type": "string",
+      "description": "Endereco IP para registros A/AAAA",
+      "oneOf": [
+        { "format": "ipv4" },
+        { "format": "ipv6" }
+      ]
+    },
+
+    "cname": {
+      "type": "string",
+      "description": "Target para registro CNAME (deve terminar com .)",
+      "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\\.$"
+    },
+
+    "exchange": {
+      "type": "string",
+      "description": "Mail server para registro MX",
+      "pattern": "^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\\.?$"
+    },
+
+    "preference": {
+      "type": "integer",
+      "description": "Prioridade MX (menor = maior prioridade)",
+      "minimum": 0,
+      "maximum": 65535,
+      "default": 10
+    },
+
+    "txtdata": {
+      "type": "string",
+      "description": "Conteudo do registro TXT",
+      "maxLength": 4096
+    },
+
+    "nsdname": {
+      "type": "string",
+      "description": "Nameserver para registro NS"
+    },
+
+    "ptrdname": {
+      "type": "string",
+      "description": "Hostname para registro PTR"
+    },
+
+    "expectedContent": {
+      "type": "string",
+      "description": "Conteudo esperado da linha para optimistic locking"
+    }
+  },
+
+  "tools": {
+    "dns.list_zones": {
+      "name": "dns.list_zones",
+      "description": "Lista todas as zonas DNS do servidor",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+
+    "dns.get_zone": {
+      "name": "dns.get_zone",
+      "description": "Obtem dump completo da zona DNS",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": { "$ref": "#/definitions/zone" }
+        },
+        "required": ["zone"]
+      }
+    },
+
+    "dns.add_record": {
+      "name": "dns.add_record",
+      "description": "Adiciona registro DNS na zona",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": { "$ref": "#/definitions/zone" },
+          "type": { "$ref": "#/definitions/recordType" },
+          "name": { "$ref": "#/definitions/name" },
+          "ttl": { "$ref": "#/definitions/ttl" },
+          "address": { "$ref": "#/definitions/address" },
+          "cname": { "$ref": "#/definitions/cname" },
+          "exchange": { "$ref": "#/definitions/exchange" },
+          "preference": { "$ref": "#/definitions/preference" },
+          "txtdata": { "$ref": "#/definitions/txtdata" },
+          "nsdname": { "$ref": "#/definitions/nsdname" },
+          "ptrdname": { "$ref": "#/definitions/ptrdname" }
+        },
+        "required": ["zone", "type", "name"],
+        "allOf": [
+          {
+            "if": { "properties": { "type": { "enum": ["A", "AAAA"] } } },
+            "then": { "required": ["address"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "CNAME" } } },
+            "then": { "required": ["cname"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "MX" } } },
+            "then": { "required": ["exchange"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "TXT" } } },
+            "then": { "required": ["txtdata"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "NS" } } },
+            "then": { "required": ["nsdname"] }
+          },
+          {
+            "if": { "properties": { "type": { "const": "PTR" } } },
+            "then": { "required": ["ptrdname"] }
+          }
+        ]
+      }
+    },
+
+    "dns.edit_record": {
+      "name": "dns.edit_record",
+      "description": "Edita registro DNS existente com suporte a optimistic locking",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": { "$ref": "#/definitions/zone" },
+          "line": { "$ref": "#/definitions/line" },
+          "expected_content": { "$ref": "#/definitions/expectedContent" },
+          "ttl": { "$ref": "#/definitions/ttl" },
+          "address": { "$ref": "#/definitions/address" },
+          "cname": { "$ref": "#/definitions/cname" },
+          "exchange": { "$ref": "#/definitions/exchange" },
+          "preference": { "$ref": "#/definitions/preference" },
+          "txtdata": { "$ref": "#/definitions/txtdata" },
+          "nsdname": { "$ref": "#/definitions/nsdname" },
+          "ptrdname": { "$ref": "#/definitions/ptrdname" }
+        },
+        "required": ["zone", "line"]
+      }
+    },
+
+    "dns.delete_record": {
+      "name": "dns.delete_record",
+      "description": "Remove registro DNS da zona",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": { "$ref": "#/definitions/zone" },
+          "line": { "$ref": "#/definitions/line" },
+          "expected_content": { "$ref": "#/definitions/expectedContent" }
+        },
+        "required": ["zone", "line"]
+      }
+    },
+
+    "dns.reset_zone": {
+      "name": "dns.reset_zone",
+      "description": "Reseta zona para configuracao padrao",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "zone": { "$ref": "#/definitions/zone" }
+        },
+        "required": ["zone"]
+      }
+    }
+  },
+
+  "fieldMappings": {
+    "zone": "Campo de zona (NUNCA use 'domain')",
+    "name": "Campo de nome do registro (NUNCA use 'host')",
+    "address": "Campo de endereco IP para A/AAAA",
+    "cname": "Campo de target para CNAME",
+    "exchange": "Campo de mail server para MX",
+    "preference": "Campo de prioridade para MX",
+    "txtdata": "Campo de conteudo para TXT",
+    "nsdname": "Campo de nameserver para NS",
+    "ptrdname": "Campo de hostname para PTR"
+  }
+}

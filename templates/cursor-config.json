@@ -1,0 +1,41 @@
+{
+  "mcpServers": {
+    "skills-whm-cpanel": {
+      "command": "node",
+      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
+      "env": {
+        "WHM_API_URL": "https://seu-servidor-whm.com:2087",
+        "WHM_API_TOKEN": "seu-token-whm-aqui",
+        "MCP_PORT": "3100",
+        "LOG_LEVEL": "info",
+        "ENABLE_METRICS": "true"
+      },
+      "disabled": false,
+      "autoStart": true,
+      "description": "Enterprise WHM/cPanel MCP Server - 23 tools for hosting management",
+      "settings": {
+        "showInlineCompletions": true,
+        "enableContextualSuggestions": true
+      }
+    }
+  },
+  "cursor.mcp": {
+    "enabled": true,
+    "servers": ["skills-whm-cpanel"],
+    "contextWindow": 100000,
+    "maxTokens": 4096
+  },
+  "cursor.ai": {
+    "models": ["claude-opus-4", "claude-sonnet-3.5"],
+    "temperature": 0.3,
+    "features": {
+      "codeCompletion": true,
+      "chat": true,
+      "toolCalls": true
+    }
+  },
+  "instructions": {
+    "pt-BR": "Para usar este MCP no Cursor AI:\n1. Abra Cursor Settings (Ctrl/Cmd + ,)\n2. Navegue para 'AI' -> 'MCP Servers'\n3. Clique em 'Add MCP Server'\n4. Cole esta configuração\n5. Configure as variáveis WHM_API_URL e WHM_API_TOKEN\n6. Salve e reinicie o Cursor\n\nExemplos de uso:\n- 'Listar todas as contas cPanel'\n- 'Criar conta para dominio exemplo.com'\n- 'Adicionar registro DNS A para www.exemplo.com'\n- 'Verificar status do servidor WHM'\n- 'Ler últimas 100 linhas do log Apache'\n\nTools disponíveis: 23 ferramentas para gerenciamento WHM/cPanel\nCategoria: Account Management, DNS, Monitoring, Files, System",
+    "en": "To use this MCP in Cursor AI:\n1. Open Cursor Settings (Ctrl/Cmd + ,)\n2. Navigate to 'AI' -> 'MCP Servers'\n3. Click 'Add MCP Server'\n4. Paste this configuration\n5. Configure WHM_API_URL and WHM_API_TOKEN variables\n6. Save and restart Cursor\n\nUsage examples:\n- 'List all cPanel accounts'\n- 'Create account for domain example.com'\n- 'Add DNS A record for www.example.com'\n- 'Check WHM server status'\n- 'Read last 100 lines of Apache log'\n\nAvailable tools: 23 tools for WHM/cPanel management\nCategory: Account Management, DNS, Monitoring, Files, System"
+  }
+}
