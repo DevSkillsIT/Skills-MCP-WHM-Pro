@@ -646,7 +646,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 
 **Skills IT - Soluções em Tecnologia**
 - Website: [https://www.skillsit.com.br](https://www.skillsit.com.br)
-- Email: contato@DevSkillsIT.com.br
+- Email: contato@skillsit.com.br
 - GitHub: [@DevSkillsIT](https://github.com/skills-it)
 
 ### Inspiration
@@ -667,7 +667,7 @@ Built on the [Model Context Protocol](https://modelcontextprotocol.io) open stan
 
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/DevSkillsIT/skills-mcp-whm-pro/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/DevSkillsIT/skills-mcp-whm-pro/discussions)
-- 📧 **Email**: contato@DevSkillsIT.com.br
+- 📧 **Email**: contato@skillsit.com.br
 
 ---
 
