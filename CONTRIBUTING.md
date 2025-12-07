@@ -16,7 +16,7 @@ First off, thank you for considering contributing to Skills MCP WHM Pro! It's pe
 
 ## Code of Conduct
 
-This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to contato@skills-it.com.br.
+This project and everyone participating in it is governed by our [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code. Please report unacceptable behavior to contato@skillsit.com.br.
 
 ---
 
@@ -397,7 +397,7 @@ When adding new features, update:
 Feel free to:
 - Open an issue for questions
 - Join discussions on GitHub
-- Email us at contato@skills-it.com.br
+- Email us at contato@skillsit.com.br
 
 ---
 
