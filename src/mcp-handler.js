@@ -1,6 +1,8 @@
 /**
  * MCP Handler - Processa requisicoes JSON-RPC 2.0
  * Implementa AC02: Lista de Tools MCP
+ * Correções aplicadas:
+ * - GAP-IMP-02: Suporte a header X-MCP-Safety-Token
  */
 
 const WHMService = require('./lib/whm-service');
@@ -10,8 +12,48 @@ const FileManager = require('./lib/file-manager');
 const logger = require('./lib/logger');
 const SafetyGuard = require('./lib/safety-guard');
 const { measureToolExecution, recordError } = require('./lib/metrics');
-const { withOperationTimeout, TimeoutError } = require('./lib/timeout');
+const { withOperationTimeout, withTimeout, TimeoutError } = require('./lib/timeout');
 const dnsSchema = require('./schemas/dns-tools.json');
+
+/**
+ * GAP-IMP-02: Extrai token de segurança do body ou header
+ * Prioridade: body.confirmationToken > header X-MCP-Safety-Token
+ *
+ * @param {object} args - Argumentos da tool call
+ * @param {object} headers - Headers HTTP da requisição (se disponíveis)
+ * @returns {string|undefined} Token de confirmação
+ */
+function extractSafetyToken(args, headers = {}) {
+  // Prioridade: body > header
+  if (args?.confirmationToken) {
+    return args.confirmationToken;
+  }
+
+  // Fallback: header HTTP
+  const headerToken = headers?.['x-mcp-safety-token'] || headers?.['X-MCP-Safety-Token'];
+  return headerToken;
+}
+
+/**
+ * Extrai token de ACL (usado pelo validateUserAccess no whm-service)
+ * Prioridade: body.aclToken > header X-MCP-ACL-Token/X-ACL-Token > Authorization
+ * Token esperado no formato "tipo:identificador" (ex: "root:admin", "reseller:res1", "user:bob")
+ */
+function extractAclToken(args, headers = {}) {
+  if (args?.aclToken) {
+    return args.aclToken;
+  }
+
+  const headerToken =
+    headers?.['x-mcp-acl-token'] ||
+    headers?.['X-MCP-ACL-Token'] ||
+    headers?.['x-acl-token'] ||
+    headers?.['X-ACL-Token'] ||
+    headers?.authorization ||
+    headers?.Authorization;
+
+  return headerToken;
+}
 
 // Carregar tools do schema
 const toolDefinitions = buildToolDefinitions();
@@ -142,6 +184,240 @@ function buildToolDefinitions() {
       }
     },
 
+    // Domain Management Tools (Phase 1)
+    {
+      name: 'domain.get_user_data',
+      description: 'Obtem dados do usuario do dominio (RF01)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' }
+        },
+        required: ['domain']
+      }
+    },
+    {
+      name: 'domain.get_all_info',
+      description: 'Retorna informacoes de todos os dominios do servidor (paginado) (RF02)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          limit: { type: 'integer', default: 100, description: 'Numero maximo de dominios por pagina (max 1000)' },
+          offset: { type: 'integer', default: 0, description: 'Numero de dominios a pular (para paginacao)' },
+          filter: { type: 'string', enum: ['addon', 'alias', 'subdomain', 'main'], description: 'Filtrar por tipo de dominio (opcional)' }
+        },
+        required: []
+      }
+    },
+    {
+      name: 'domain.get_owner',
+      description: 'Obtem proprietario do dominio (RF03)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' }
+        },
+        required: ['domain']
+      }
+    },
+    {
+      name: 'domain.create_alias',
+      description: 'Cria dominio alias (parked domain) (RF10)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do novo dominio alias' },
+          username: { type: 'string', description: 'Proprietario (usuario cPanel)' },
+          target_domain: { type: 'string', description: 'Dominio alvo que sera apontado (opcional)' }
+        },
+        required: ['domain', 'username']
+      }
+    },
+    {
+      name: 'domain.create_subdomain',
+      description: 'Cria subdominio (RF11)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          subdomain: { type: 'string', description: 'Nome do subdominio (sem o dominio pai)' },
+          domain: { type: 'string', description: 'Dominio pai' },
+          username: { type: 'string', description: 'Proprietario' },
+          document_root: { type: 'string', description: 'Raiz do documento (path no servidor)' }
+        },
+        required: ['subdomain', 'domain', 'username']
+      }
+    },
+    {
+      name: 'domain.delete',
+      description: 'Deleta dominio (addon/parked/subdomain) - OPERACAO DESTRUTIVA (RF12)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio a deletar' },
+          username: { type: 'string', description: 'Proprietario' },
+          type: { type: 'string', enum: ['addon', 'parked', 'subdomain'], description: 'Tipo de dominio' },
+          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
+          reason: { type: 'string', description: 'Motivo detalhado da delecao' }
+        },
+        required: ['domain', 'username', 'type', 'confirmationToken', 'reason']
+      }
+    },
+    {
+      name: 'domain.resolve',
+      description: 'Resolve nome de dominio para IP (RF13)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' }
+        },
+        required: ['domain']
+      }
+    },
+
+    // Addon Domain Tools (Phase 2)
+    {
+      name: 'domain.addon.list',
+      description: 'Lista todos os addon domains de um usuario (RF04)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          username: { type: 'string', description: 'Usuario cPanel' }
+        },
+        required: ['username']
+      }
+    },
+    {
+      name: 'domain.addon.details',
+      description: 'Obtem detalhes de um addon domain (RF05)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do addon domain' },
+          username: { type: 'string', description: 'Usuario cPanel' }
+        },
+        required: ['domain', 'username']
+      }
+    },
+    {
+      name: 'domain.addon.conversion_status',
+      description: 'Obtem status de conversao de addon domain (RF06)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          conversion_id: { type: 'string', description: 'ID da conversao' }
+        },
+        required: ['conversion_id']
+      }
+    },
+    {
+      name: 'domain.addon.start_conversion',
+      description: 'Inicia conversao de addon domain para conta independente [SAFETY GUARD] (RF07)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Addon domain a converter' },
+          username: { type: 'string', description: 'Usuario atual' },
+          new_username: { type: 'string', description: 'Novo usuario para a conta' },
+          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
+          reason: { type: 'string', description: 'Motivo da conversao (min 10 chars)' }
+        },
+        required: ['domain', 'username', 'new_username', 'confirmationToken', 'reason']
+      }
+    },
+    {
+      name: 'domain.addon.conversion_details',
+      description: 'Obtem detalhes completos de uma conversao (RF08)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          conversion_id: { type: 'string', description: 'ID da conversao' }
+        },
+        required: ['conversion_id']
+      }
+    },
+    {
+      name: 'domain.addon.list_conversions',
+      description: 'Lista todas as conversoes de addon domains (RF09)',
+      inputSchema: {
+        type: 'object',
+        properties: {},
+        required: []
+      }
+    },
+
+    // Domain Authority and DNSSEC Tools (Phase 2)
+    {
+      name: 'domain.check_authority',
+      description: 'Verifica se servidor e autoritativo para dominio (RF14)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' }
+        },
+        required: ['domain']
+      }
+    },
+    {
+      name: 'domain.get_ds_records',
+      description: 'Obtem registros DS (DNSSEC) de dominios (RF17)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 100)' }
+        },
+        required: ['domains']
+      }
+    },
+    {
+      name: 'domain.enable_nsec3',
+      description: 'Habilita semantica NSEC3 (DNSSEC) para dominios [SAFETY GUARD] (RF19)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 50)' },
+          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
+          reason: { type: 'string', description: 'Motivo da alteracao (min 10 chars)' }
+        },
+        required: ['domains', 'confirmationToken', 'reason']
+      }
+    },
+    {
+      name: 'domain.disable_nsec3',
+      description: 'Desabilita NSEC3 para dominios [SAFETY GUARD] (RF20)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 50)' },
+          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
+          reason: { type: 'string', description: 'Motivo da alteracao (min 10 chars)' }
+        },
+        required: ['domains', 'confirmationToken', 'reason']
+      }
+    },
+    {
+      name: 'domain.get_nsec3_status',
+      description: 'Consulta status de operacao NSEC3 assincrona para polling (RF22)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          operation_id: { type: 'string', description: 'ID da operacao NSEC3' }
+        },
+        required: ['operation_id']
+      }
+    },
+    {
+      name: 'domain.update_userdomains',
+      description: 'Atualiza arquivo /etc/userdomains [SAFETY GUARD] (RF21)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
+          reason: { type: 'string', description: 'Motivo da atualizacao (min 10 chars)' }
+        },
+        required: ['confirmationToken', 'reason']
+      }
+    },
+
     // DNS Tools (CC-03)
     {
       name: 'dns.list_zones',
@@ -227,6 +503,43 @@ function buildToolDefinitions() {
           reason: { type: 'string' }
         },
         required: ['zone']
+      }
+    },
+    {
+      name: 'dns.list_mx',
+      description: 'Lista todos os registros MX configurados para um dominio (RF15)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' }
+        },
+        required: ['domain']
+      }
+    },
+    {
+      name: 'dns.add_mx',
+      description: 'Adiciona novo registro MX para um dominio (RF16)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          domain: { type: 'string', description: 'Nome do dominio' },
+          exchange: { type: 'string', description: 'Servidor de email' },
+          priority: { type: 'integer', default: 10, description: 'Prioridade MX (opcional)' },
+          alwaysaccept: { type: 'boolean', default: false, description: 'Sempre aceitar email (opcional)' }
+        },
+        required: ['domain', 'exchange']
+      }
+    },
+    {
+      name: 'dns.check_alias_available',
+      description: 'Verifica se registro ALIAS DNS esta disponivel (RF18)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          zone: { type: 'string', description: 'Nome da zona' },
+          name: { type: 'string', description: 'Nome do registro' }
+        },
+        required: ['zone', 'name']
       }
     },
 
@@ -335,6 +648,7 @@ class MCPHandler {
     this.dnsService = null;
     this.sshManager = null;
     this.fileManager = null;
+    this.currentHeaders = {}; // GAP-IMP-02: Armazenar headers da requisição atual
 
     // Inicializar servicos lazy
     this.initServices();
@@ -358,9 +672,17 @@ class MCPHandler {
 
   /**
    * Processa requisicao MCP JSON-RPC 2.0
+   * Correções aplicadas:
+   * - GAP-IMP-02: Aceita headers opcionais para token via header HTTP
+   *
+   * @param {object} request - Requisição JSON-RPC
+   * @param {object} headers - Headers HTTP opcionais
    */
-  async handleRequest(request) {
+  async handleRequest(request, headers = {}) {
     const { jsonrpc, method, params, id } = request;
+
+    // GAP-IMP-02: Armazenar headers para uso nas tool calls
+    this.currentHeaders = headers || {};
 
     // Validar formato JSON-RPC
     if (jsonrpc !== '2.0') {
@@ -459,26 +781,48 @@ class MCPHandler {
 
   /**
    * Executa tool pelo nome
+   * Correções aplicadas:
+   * - GAP-IMP-02: Enriquecer args com token de header se não fornecido no body
    */
   async executeTool(name, args) {
+    // GAP-IMP-02: Se confirmationToken não está no body, tentar extrair do header
+    const enrichedArgs = { ...args };
+    if (!enrichedArgs.confirmationToken) {
+      const headerToken = extractSafetyToken(args, this.currentHeaders);
+      if (headerToken) {
+        enrichedArgs.confirmationToken = headerToken;
+      }
+    }
+
+    // Propagar token de ACL para o whmService (usado pelo validateUserAccess)
+    const aclToken = extractAclToken(args, this.currentHeaders);
+    if (aclToken && this.whmService) {
+      this.whmService.currentToken = aclToken;
+    }
+
     // WHM Tools
     if (name.startsWith('whm.')) {
-      return await this.executeWhmTool(name, args);
+      return await this.executeWhmTool(name, enrichedArgs);
+    }
+
+    // Domain Tools (Phase 1)
+    if (name.startsWith('domain.')) {
+      return await this.executeDomainTool(name, enrichedArgs);
     }
 
     // DNS Tools
     if (name.startsWith('dns.')) {
-      return await this.executeDnsTool(name, args);
+      return await this.executeDnsTool(name, enrichedArgs);
     }
 
     // SSH/System Tools
     if (name.startsWith('system.') || name.startsWith('log.')) {
-      return await this.executeSshTool(name, args);
+      return await this.executeSshTool(name, enrichedArgs);
     }
 
     // File Tools
     if (name.startsWith('file.')) {
-      return await this.executeFileTool(name, args);
+      return await this.executeFileTool(name, enrichedArgs);
     }
 
     throw new Error(`Unknown tool category: ${name}`);
@@ -573,6 +917,161 @@ class MCPHandler {
   }
 
   /**
+   * Executa tools de gerenciamento de domínios (Phase 1)
+   */
+  async executeDomainTool(name, args) {
+    if (!this.whmService) {
+      throw new Error('WHM service not configured');
+    }
+
+    switch (name) {
+      case 'domain.get_user_data':
+        return await withOperationTimeout(
+          () => this.whmService.getDomainUserData(args.domain),
+          'domain.get_user_data'
+        );
+
+      case 'domain.get_all_info':
+        return await withOperationTimeout(
+          () => this.whmService.getAllDomainInfo(args.limit, args.offset, args.filter),
+          'domain.get_all_info'
+        );
+
+      case 'domain.get_owner':
+        return await withOperationTimeout(
+          () => this.whmService.getDomainOwner(args.domain),
+          'domain.get_owner'
+        );
+
+      case 'domain.create_alias':
+        return await withOperationTimeout(
+          () => this.whmService.createParkedDomain(
+            args.domain,
+            args.username,
+            args.target_domain
+          ),
+          'domain.create_alias'
+        );
+
+      case 'domain.create_subdomain':
+        return await withOperationTimeout(
+          () => this.whmService.createSubdomain(
+            args.subdomain,
+            args.domain,
+            args.username,
+            args.document_root
+          ),
+          'domain.create_subdomain'
+        );
+
+      case 'domain.delete':
+        SafetyGuard.requireConfirmation('domain.delete', args);
+        return await withOperationTimeout(
+          () => this.whmService.deleteDomain(
+            args.domain,
+            args.username,
+            args.type,
+            true // confirmed=true because SafetyGuard already validated
+          ),
+          'domain.delete'
+        );
+
+      case 'domain.resolve':
+        return await withOperationTimeout(
+          () => this.whmService.resolveDomainName(args.domain),
+          'domain.resolve'
+        );
+
+      // Addon Domain Tools (Phase 2)
+      case 'domain.addon.list':
+        return await withOperationTimeout(
+          () => this.whmService.listAddonDomains(args.username),
+          'domain.addon.list'
+        );
+
+      case 'domain.addon.details':
+        return await withOperationTimeout(
+          () => this.whmService.getAddonDomainDetails(args.domain, args.username),
+          'domain.addon.details'
+        );
+
+      case 'domain.addon.conversion_status':
+        return await withOperationTimeout(
+          () => this.whmService.getConversionStatus(args.conversion_id),
+          'domain.addon.conversion_status'
+        );
+
+      case 'domain.addon.start_conversion':
+        SafetyGuard.requireConfirmation('domain.addon.start_conversion', args);
+        return await withOperationTimeout(
+          () => this.whmService.initiateAddonConversion(args),
+          'domain.addon.start_conversion'
+        );
+
+      case 'domain.addon.conversion_details':
+        return await withOperationTimeout(
+          () => this.whmService.getConversionDetails(args.conversion_id),
+          'domain.addon.conversion_details'
+        );
+
+      case 'domain.addon.list_conversions':
+        return await withOperationTimeout(
+          () => this.whmService.listConversions(),
+          'domain.addon.list_conversions'
+        );
+
+      // Domain Authority and DNSSEC Tools (Phase 2)
+      case 'domain.check_authority':
+        return await withOperationTimeout(
+          () => this.whmService.hasLocalAuthority(args.domain),
+          'domain.check_authority'
+        );
+
+      case 'domain.get_ds_records':
+        return await withOperationTimeout(
+          () => this.whmService.getDSRecords(args.domains),
+          'domain.get_ds_records'
+        );
+
+      case 'domain.enable_nsec3':
+        SafetyGuard.requireConfirmation('domain.enable_nsec3', args);
+        // Dynamic timeout: 60s + (30s * num_domains), max 600s
+        const enableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
+        return await withOperationTimeout(
+          () => this.whmService.setNSEC3ForDomains(args.domains),
+          'domain.enable_nsec3',
+          enableTimeout
+        );
+
+      case 'domain.disable_nsec3':
+        SafetyGuard.requireConfirmation('domain.disable_nsec3', args);
+        // Dynamic timeout: 60s + (30s * num_domains), max 600s
+        const disableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
+        return await withOperationTimeout(
+          () => this.whmService.unsetNSEC3ForDomains(args.domains),
+          'domain.disable_nsec3',
+          disableTimeout
+        );
+
+      case 'domain.get_nsec3_status':
+        return await withOperationTimeout(
+          () => this.whmService.getNsec3Status(args.operation_id),
+          'domain.get_nsec3_status'
+        );
+
+      case 'domain.update_userdomains':
+        SafetyGuard.requireConfirmation('domain.update_userdomains', args);
+        return await withOperationTimeout(
+          () => this.whmService.updateUserdomains(),
+          'domain.update_userdomains'
+        );
+
+      default:
+        throw new Error(`Unknown Domain tool: ${name}`);
+    }
+  }
+
+  /**
    * Executa tools DNS (CC-03, CC-04)
    */
   async executeDnsTool(name, args) {
@@ -639,6 +1138,29 @@ class MCPHandler {
         return await withOperationTimeout(
           () => this.dnsService.resetZone(args.zone),
           'dns.reset_zone'
+        );
+
+      case 'dns.list_mx':
+        return await withOperationTimeout(
+          () => this.whmService.listMXRecords(args.domain),
+          'dns.list_mx'
+        );
+
+      case 'dns.add_mx':
+        return await withOperationTimeout(
+          () => this.whmService.saveMXRecord(
+            args.domain,
+            args.exchange,
+            args.priority,
+            args.alwaysaccept
+          ),
+          'dns.add_mx'
+        );
+
+      case 'dns.check_alias_available':
+        return await withOperationTimeout(
+          () => this.whmService.isAliasAvailable(args.zone, args.name),
+          'dns.check_alias_available'
         );
 
       default:

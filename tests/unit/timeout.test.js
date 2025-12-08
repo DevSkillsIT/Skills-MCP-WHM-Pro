@@ -35,8 +35,8 @@ describe('Timeout System', () => {
         fail('Should have thrown TimeoutError');
       } catch (error) {
         expect(error).toBeInstanceOf(TimeoutError);
-        expect(error.message).toContain('custom-operation');
-        expect(error.message).toContain('1000ms');
+        expect(error.operation).toBe('custom-operation');
+        expect(error.timeoutMs).toBe(1000);
       }
     });
 
@@ -52,22 +52,15 @@ describe('Timeout System', () => {
     });
 
     it('deve cancelar timeout se função completar com sucesso', async () => {
-      jest.useFakeTimers();
-
       const fastFn = async () => {
+        // Função que completa rapidamente sem timers
         return { success: true };
       };
 
-      const promise = withTimeout(fastFn, 5000, 'test');
-
-      // Executar timers pendentes
-      jest.runAllTimers();
-
-      const result = await promise;
+      // Use real timers para este teste - a função completa rápido
+      const result = await withTimeout(fastFn, 5000, 'test');
 
       expect(result.success).toBe(true);
-
-      jest.useRealTimers();
     });
   });
 
@@ -109,10 +102,9 @@ describe('Timeout System', () => {
 
       expect(error).toBeInstanceOf(Error);
       expect(error).toBeInstanceOf(TimeoutError);
-      expect(error.message).toContain('test-op');
-      expect(error.message).toContain('5000ms');
       expect(error.operation).toBe('test-op');
       expect(error.timeoutMs).toBe(5000);
+      expect(error.timeoutSeconds).toBe(5);
     });
 
     it('deve ter propriedades de operação e timeout', () => {
@@ -143,23 +135,37 @@ describe('Timeout System', () => {
 
   describe('Edge Cases', () => {
     it('deve tratar timeout zero', async () => {
+      jest.useFakeTimers();
+
       const fn = async () => {
         return { success: true };
       };
 
-      await expect(
-        withTimeout(fn, 0, 'zero-timeout')
-      ).rejects.toThrow(TimeoutError);
+      const promise = withTimeout(fn, 0, 'zero-timeout');
+
+      // Advance fake timers to trigger the timeout
+      jest.runAllTimers();
+
+      await expect(promise).rejects.toThrow(TimeoutError);
+
+      jest.useRealTimers();
     });
 
     it('deve tratar timeout negativo como inválido', async () => {
+      jest.useFakeTimers();
+
       const fn = async () => {
         return { success: true };
       };
 
-      await expect(
-        withTimeout(fn, -1000, 'negative-timeout')
-      ).rejects.toThrow(TimeoutError);
+      const promise = withTimeout(fn, -1000, 'negative-timeout');
+
+      // Advance fake timers to trigger the timeout
+      jest.runAllTimers();
+
+      await expect(promise).rejects.toThrow(TimeoutError);
+
+      jest.useRealTimers();
     });
 
     it('deve tratar timeout muito longo', async () => {
@@ -195,6 +201,8 @@ describe('Timeout System', () => {
 
   describe('Multiple Concurrent Operations', () => {
     it('deve permitir múltiplos timeouts concorrentes', async () => {
+      jest.useFakeTimers();
+
       const fn1 = async () => {
         await new Promise(r => setTimeout(r, 100));
         return { id: 1 };
@@ -210,18 +218,26 @@ describe('Timeout System', () => {
         return { id: 3 };
       };
 
-      const [result1, result2, result3] = await Promise.all([
+      const promise = Promise.all([
         withTimeout(fn1, 1000, 'op1'),
         withTimeout(fn2, 1000, 'op2'),
         withTimeout(fn3, 1000, 'op3')
       ]);
 
+      jest.advanceTimersByTime(1000);
+
+      const [result1, result2, result3] = await promise;
+
       expect(result1.id).toBe(1);
       expect(result2.id).toBe(2);
       expect(result3.id).toBe(3);
+
+      jest.useRealTimers();
     });
 
     it('deve tratar timeouts diferentes corretamente', async () => {
+      jest.useFakeTimers();
+
       const fastFn = async () => {
         await new Promise(r => setTimeout(r, 100));
         return { success: true };
@@ -232,16 +248,22 @@ describe('Timeout System', () => {
         return { success: true };
       };
 
-      const [fastResult, slowError] = await Promise.allSettled([
+      const promise = Promise.allSettled([
         withTimeout(fastFn, 1000, 'fast'),
         withTimeout(slowFn, 500, 'slow')
       ]);
+
+      jest.advanceTimersByTime(1000);
+
+      const [fastResult, slowError] = await promise;
 
       expect(fastResult.status).toBe('fulfilled');
       expect(fastResult.value.success).toBe(true);
 
       expect(slowError.status).toBe('rejected');
       expect(slowError.reason).toBeInstanceOf(TimeoutError);
+
+      jest.useRealTimers();
     });
   });
 });

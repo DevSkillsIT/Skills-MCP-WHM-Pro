@@ -65,6 +65,7 @@ class TimeoutError extends Error {
     super(`Operation timed out after ${timeoutMs / 1000}s`);
     this.name = 'TimeoutError';
     this.operation = operation;
+    this.timeoutMs = timeoutMs;
     this.timeoutSeconds = timeoutMs / 1000;
     this.code = -32000; // Codigo JSON-RPC para server error
   }
