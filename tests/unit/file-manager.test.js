@@ -35,31 +35,36 @@ describe('FileManager - Path Validation', () => {
     it('deve bloquear acesso a /etc/shadow', () => {
       const result = validatePath('/etc/shadow', 'testuser');
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('forbidden');
+      // Path absoluto fora de /home/testuser é bloqueado como directory traversal
+      expect(result.error).toContain('Directory traversal');
     });
 
     it('deve bloquear acesso a /etc/passwd', () => {
       const result = validatePath('/etc/passwd', 'testuser');
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('forbidden');
+      // Path absoluto fora de /home/testuser é bloqueado como directory traversal
+      expect(result.error).toContain('Directory traversal');
     });
 
     it('deve bloquear acesso a /root', () => {
       const result = validatePath('/root/.ssh/id_rsa', 'testuser');
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('forbidden');
+      // Path absoluto fora de /home/testuser é bloqueado como directory traversal
+      expect(result.error).toContain('Directory traversal');
     });
 
     it('deve bloquear acesso a /.env', () => {
       const result = validatePath('/.env', 'testuser');
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('forbidden');
+      // Path absoluto fora de /home/testuser é bloqueado como directory traversal
+      expect(result.error).toContain('Directory traversal');
     });
 
     it('deve bloquear acesso a /proc', () => {
       const result = validatePath('/proc/self/environ', 'testuser');
       expect(result.valid).toBe(false);
-      expect(result.error).toContain('forbidden');
+      // Path absoluto fora de /home/testuser é bloqueado como directory traversal
+      expect(result.error).toContain('Directory traversal');
     });
 
     it('deve permitir path válido dentro de /home/user', () => {

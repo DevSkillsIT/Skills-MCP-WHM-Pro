@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](package.json)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-orange)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/Tools-23-success)](schemas/mcp-tools.json)
+[![Tools](https://img.shields.io/badge/Tools-45-success)](schemas/mcp-tools.json)
 
 *The most complete MCP server for WHM and cPanel automation available today*
 
@@ -48,11 +48,11 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 ### Key Capabilities
 
 - 🏢 **WHM Account Management** - Create, suspend, terminate, and manage cPanel accounts
-- 🌐 **Advanced DNS Management** - Full DNS zone control with optimistic locking
+- 🌐 **Domain Lifecycle & DNSSEC** - 22 new `domain.*`/`dns.*` tools (addon conversion, NSEC3 enable/disable + polling, DS/ALIAS checks, MX idempotência)
 - 📊 **Server Monitoring** - Real-time server status, load averages, and service health
 - 📁 **File Operations** - Secure file management within cPanel accounts
 - 📝 **Log Analysis** - Access and analyze server logs
-- 🔒 **Enterprise Security** - Safety guards, input validation, and audit logging
+- 🔒 **Enterprise Security** - SafetyGuard header, ACL enforcement, domain/path validation, audit logging
 
 ---
 
@@ -62,12 +62,12 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 | Feature | Skills MCP WHM Pro | whmrockstar | Others |
 |---------|-------------------|-------------|--------|
-| **Total Tools** | ✅ 23 tools | ⚠️ 11 tools | ❌ Limited |
+| **Total Tools** | ✅ 45 tools | ⚠️ 11 tools | ❌ Limited |
 | **DNS Optimistic Locking** | ✅ Yes | ❌ No | ❌ No |
 | **Safety Guard System** | ✅ Yes | ❌ No | ❌ No |
 | **Configurable Timeouts** | ✅ Yes | ⚠️ Fixed | ❌ No |
 | **Retry Logic** | ✅ Exponential backoff | ❌ No | ❌ No |
-| **Path Validation** | ✅ Yes | ⚠️ Basic | ❌ No |
+| **Path/Domain Validation** | ✅ Domain & docroot hardening | ⚠️ Basic | ❌ No |
 | **CLI Tools** | ✅ 4 commands | ❌ None | ❌ None |
 | **IDE Templates** | ✅ 4 IDEs | ❌ None | ❌ None |
 | **Schema Export** | ✅ JSON schemas | ❌ No | ❌ No |
@@ -76,7 +76,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ### What Makes Us Different
 
-1. **+109% More Tools** - 23 tools vs 11 in whmrockstar
+1. **+309% More Tools** - 45 tools vs 11 in whmrockstar
 2. **Production-Ready** - Battle-tested in real MSP environments
 3. **Security-First** - Multiple layers of protection against data loss
 4. **Developer-Friendly** - Complete schemas, CLI tools, and IDE integration
@@ -86,18 +86,30 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ## ✨ Features
 
+### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
+
+- **22 novas tools `domain.*`/`dns.*`** cobrindo usuário, owner, resolução, MX, DS/DNSSEC, NSEC3 enable/disable com polling, update_userdomains e verificação de autoridade
+- **Paginacao obrigatoria** em `domain.get_all_info` (`limit/offset/filter`) com metadados `has_more/next_offset`
+- **Addon conversions end-to-end**: listar, detalhes, iniciar conversão (SafetyGuard) e status via `conversion_id`
+- **DNSSEC & NSEC3**: operações assíncronas com `operation_id`, timeout dinâmico `60s + 30s * dom` (máx 600s) e `domain.get_nsec3_status` para polling
+- **MX e ALIAS com idempotência e clareza**: `dns.add_mx` evita duplicatas, `dns.check_alias_available` retorna erro claro se o endpoint não existir no WHM, `domain.get_ds_records` responde com fallback quando DNSSEC não está habilitado
+- **/etc/userdomains com lock**: `domain.update_userdomains` usa `lock-manager` e transaction-log para evitar race conditions
+
 ### 🛡️ Enterprise Security
 
 - **Safety Guard System** - Prevents accidental data loss with confirmation tokens
+- **SafetyGuard Header** - `X-MCP-Safety-Token` suportado (body tem precedência) para operações destrutivas
+- **ACL Enforcement** - `X-MCP-ACL-Token`/`X-ACL-Token`/`Authorization` propagados para validação root/reseller/user
+- **Domain Validation (RS01)** - Rejeita FQDNs inválidos, traversal e metacaracteres em TODAS as tools com `domain`
+- **Path Validation (RS03)** - Directory traversal protection para `document_root`
 - **DNS Optimistic Locking** - Prevents race conditions in DNS updates
-- **Path Validation** - Directory traversal protection
-- **Input Sanitization** - LDAP injection and XSS prevention
 - **Credential Sanitization** - Never logs API tokens or passwords
 - **Audit Logging** - Complete audit trail of all operations
 
 ### ⚡ Performance & Reliability
 
-- **Configurable Timeouts** - Via environment variables (WHM_TIMEOUT)
+- **Configurable Timeouts** - `WHM_TIMEOUT` + timeouts por tipo; NSEC3 usa cálculo dinâmico (máx 600s)
+- **Clear Fallbacks** - DS/ALIAS usam `withTimeout` para evitar travamento e retornam motivo quando DNSSEC/endpoint não existem
 - **Exponential Backoff** - Intelligent retry logic with configurable attempts
 - **Connection Pooling** - Efficient resource management
 - **Prometheus Metrics** - Production monitoring and alerting
@@ -113,9 +125,10 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ### 🌐 DNS Management Excellence
 
-- Full zone management (create, read, update, delete)
-- Support for all record types: A, AAAA, CNAME, MX, TXT, NS, PTR
-- Optimistic locking prevents concurrent modification conflicts
+- Full zone management (create, read, update, delete) com optimistic locking
+- Support for all record types: A, AAAA, CNAME, MX, TXT, NS, PTR, DS, ALIAS availability
+- **Domain MX idempotent** (`dns.add_mx`) evita duplicatas; `dns.list_mx` e `domain.check_authority` incluídos
+- **DNSSEC & NSEC3**: fetch DS (com fallback se não habilitado), enable/disable NSEC3 com polling `domain.get_nsec3_status`
 - Automatic serial number management
 - TTL configuration per record
 
@@ -251,6 +264,12 @@ RETRY_INITIAL_DELAY=1000
 NODE_ENV=production
 ```
 
+### Request headers to remember
+
+- `x-api-key`: required for every call
+- `X-MCP-ACL-Token` / `X-ACL-Token` (ou `Authorization`): propagado para validação ACL (root/reseller/user)
+- `X-MCP-Safety-Token`: alternativa ao `confirmationToken` no body para operações destrutivas (body tem precedência)
+
 ### Obtaining WHM API Token
 
 1. Log in to WHM as root
@@ -297,7 +316,7 @@ Expected response:
 {
   "status": "healthy",
   "service": "skills-mcp-whm-pro",
-  "version": "1.0.0",
+  "version": "1.4.0",
   "timestamp": "2025-12-07T14:00:00.000Z"
 }
 ```
@@ -333,9 +352,9 @@ curl -X POST http://localhost:3100/mcp \
 
 ---
 
-## 🛠️ Available Tools
+## 🛠️ Available Tools (45)
 
-### WHM Account Management (6 tools)
+### WHM Account Management (10)
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
@@ -345,55 +364,80 @@ curl -X POST http://localhost:3100/mcp \
 | `whm.unsuspend_account` | Unsuspend cPanel account | Write |
 | `whm.terminate_account` | Permanently delete account | Destructive ⚠️ |
 | `whm.get_account_summary` | Get detailed account info | Read-only |
+| `whm.server_status` | Server status & uptime | Read-only |
+| `whm.service_status` | Service status (httpd, mysql, etc.) | Read-only |
+| `whm.restart_service` | Restart WHM service (SafetyGuard) | Write |
+| `whm.list_domains` | List domains of an account | Read-only |
 
-### DNS Management (6 tools)
+### Domain Information (3)
+
+| Tool | Description | Security Level |
+|------|-------------|----------------|
+| `domain.get_user_data` | User data for a domain | Read-only |
+| `domain.get_all_info` | Paginated domain listing (`limit/offset/filter`) | Read-only |
+| `domain.get_owner` | Owner (cPanel account) of a domain | Read-only |
+
+### Domain Management & Safety (5)
+
+| Tool | Description | Security Level |
+|------|-------------|----------------|
+| `domain.create_alias` | Create parked/alias domain (idempotent) | Write |
+| `domain.create_subdomain` | Create subdomain with docroot validation | Write |
+| `domain.delete` | Delete domain (SafetyGuard required) | Destructive ⚠️ |
+| `domain.resolve` | Resolve domain to IP | Read-only |
+| `domain.check_authority` | Check if server is authoritative | Read-only |
+
+### Addon Conversion Suite (6)
+
+| Tool | Description | Security Level |
+|------|-------------|----------------|
+| `domain.addon.list` | List addon domains for user | Read-only |
+| `domain.addon.details` | Details of an addon domain | Read-only |
+| `domain.addon.conversion_status` | Status of conversion by `conversion_id` | Read-only |
+| `domain.addon.start_conversion` | Start conversion (SafetyGuard) | Write ⚠️ |
+| `domain.addon.conversion_details` | Full conversion details | Read-only |
+| `domain.addon.list_conversions` | List all conversions | Read-only |
+
+### DNSSEC, DS & Maintenance (5)
+
+| Tool | Description | Security Level |
+|------|-------------|----------------|
+| `domain.get_ds_records` | Fetch DS records (DNSSEC) with timeout/fallback | Read-only |
+| `domain.enable_nsec3` | Enable NSEC3 (returns `operation_id`) | Write ⚠️ |
+| `domain.disable_nsec3` | Disable NSEC3 (returns `operation_id`) | Write ⚠️ |
+| `domain.get_nsec3_status` | Poll async NSEC3 operations | Read-only |
+| `domain.update_userdomains` | Update `/etc/userdomains` with lock | Write ⚠️ |
+
+### DNS Extensions (MX & ALIAS) (3)
+
+| Tool | Description | Security Level |
+|------|-------------|----------------|
+| `dns.list_mx` | List MX records | Read-only |
+| `dns.add_mx` | Add MX (idempotent, validates priority) | Write |
+| `dns.check_alias_available` | Check ALIAS availability (clear error if unsupported) | Read-only |
+
+### DNS Zone Management (6)
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
 | `dns.list_zones` | List all DNS zones | Read-only |
 | `dns.get_zone` | Get complete zone records | Read-only |
 | `dns.add_record` | Add DNS record to zone | Write |
-| `dns.edit_record` | Edit existing DNS record | Write |
+| `dns.edit_record` | Edit existing DNS record (optimistic lock) | Write |
 | `dns.delete_record` | Delete DNS record | Destructive ⚠️ |
 | `dns.reset_zone` | Reset zone to defaults | Destructive ⚠️ |
 
-### Monitoring (3 tools)
+### System & Observability
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
-| `whm.server_status` | Get server status & uptime | Read-only |
-| `whm.service_status` | Check specific service status | Read-only |
-| `system.get_load` | Get load averages & usage | Read-only |
-
-### System Management (2 tools)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `whm.restart_service` | Restart system service | Write |
-| `system.restart_service` | Restart service (allowlist) | Write |
-
-### File Management (4 tools)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
+| `system.get_load` | Load averages & usage | Read-only |
+| `system.restart_service` | Restart allowlisted system service | Write |
+| `log.read_last_lines` | Tail log files (allowlist) | Read-only |
 | `file.list` | List files in cPanel account | Read-only |
 | `file.read` | Read file content | Read-only |
 | `file.write` | Write file (auto-backup) | Write |
-| `file.delete` | Delete file | Destructive ⚠️ |
-
-### Log Management (1 tool)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `log.read_last_lines` | Read last N lines from log | Read-only |
-
-### Other (1 tool)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `whm.list_domains` | List all domains on server | Read-only |
-
-**Total: 23 Tools** (vs 11 in whmrockstar)
+| `file.delete` | Delete file (SafetyGuard) | Destructive ⚠️ |
 
 ---
 
@@ -429,7 +473,7 @@ npx skills-whm-mcp help
 ### Example Output: introspect
 
 ```
-Available MCP Tools (23 total):
+Available MCP Tools (45 total):
 
  1. whm.list_accounts      - List all cPanel accounts on the WHM server...
  2. whm.create_account     - Create a new cPanel account with specified...
@@ -494,6 +538,8 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Suspend account badpayer due to non-payment"
 "Show me all cPanel accounts on the server"
 "What's the disk usage for account example?"
+"Give me a summary of the account cpuser and list its domains"
+"Restart the mysql service safely and confirm status"
 ```
 
 #### DNS Management
@@ -502,6 +548,16 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Add MX record for example.com pointing to mail.example.com with priority 10"
 "Show all DNS records for example.com"
 "Add SPF record for example.com"
+"List all domains with pagination limit 50"
+"Check if ALIAS www is available on example.com"
+"Fetch DS records for example.com and otherdomain.com"
+"Enable NSEC3 for example.com and poll status"
+"List addon domains for user cpuser and fetch details for one of them"
+"Start addon conversion and monitor status until completed"
+"List MX records for exemplo.com.br and add a backup MX with priority 20"
+"Edit the A record for api.exemplo.com.br to 198.51.100.10 using optimistic lock"
+"Reset the DNS zone for lab.exemplo.com.br after taking a backup"
+"Delete the CNAME for old.exemplo.com.br with SafetyGuard token"
 ```
 
 #### Monitoring
@@ -510,6 +566,8 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Is Apache running?"
 "Show me the server load and memory usage"
 "Check the last 100 lines of Apache error log"
+"Restart httpd and show me the last 50 lines of the error log"
+"List PM2 status of the MCP service"
 ```
 
 #### Troubleshooting
@@ -517,6 +575,182 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Client's website example.com is not loading - investigate"
 "Check email configuration for clientdomain.com"
 "Show error logs for httpd service"
+"Update /etc/userdomains and then list domains for account alice"
+"Resolve cdn.example.com and verify if the server is authoritative"
+"Run a safety-guarded delete of temp.example.com then confirm it is gone"
+"Enable NSEC3 for example.com and keep polling until completion"
+"Start addon conversion for blog.example.com to new user bloguser and monitor status"
+"List addon domains for cpuser and get details of blog.cpuser.com"
+"Create a subdomain api.example.com under cpuser with document root /home/cpuser/api"
+"Check alias availability for www.example.com in zone example.com before creating it"
+
+### Curl Examples by Tool (quick copy/paste)
+
+> Ajuste `MCP_HOST`, `MCP_API_KEY`, `MCP_SAFETY_TOKEN`, `MCP_ACL_TOKEN`, domínios e usuários antes de usar.
+
+#### WHM Account & Server
+- `whm.list_accounts`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.list_accounts","arguments":{}},"id":1}'
+```
+- `whm.create_account`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.create_account","arguments":{"username":"newcp","domain":"newcp.com.br","password":"S3nh@F0rte","email":"ops@exemplo.com","package":"default","reason":"Onboarding cliente"}},"id":2}'
+```
+- `whm.server_status` / `whm.service_status`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.service_status","arguments":{}},"id":3}'
+```
+
+#### Domain Info (RF01-RF03, RNF07)
+- `domain.get_user_data`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_user_data","arguments":{"domain":"exemplo.com.br"}},"id":10}'
+```
+- `domain.get_all_info` (paginação):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_all_info","arguments":{"limit":50,"offset":0,"filter":"addon"}},"id":11}'
+```
+- `domain.get_owner`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_owner","arguments":{"domain":"exemplo.com.br"}},"id":12}'
+```
+
+#### Domain Management & Safety (RF10-RF13, RF21)
+- `domain.create_alias` (idempotente):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_alias","arguments":{"domain":"aliaslab.com.br","username":"cpuser"}},"id":20}'
+```
+- `domain.create_subdomain` com docroot validado:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/api"}},"id":21}'
+```
+- `domain.delete` (SafetyGuard via header):
+```bash
+curl -s -X POST $MCP_HOST/mcp \
+  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.delete","arguments":{"domain":"temp.exemplo.com.br","username":"cpuser","type":"subdomain","reason":"Remocao de teste automatizada"}},"id":22}'
+```
+- `domain.resolve`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.resolve","arguments":{"domain":"exemplo.com.br"}},"id":23}'
+``}
+```
+- `domain.update_userdomains` (lock + SafetyGuard):
+```bash
+curl -s -X POST $MCP_HOST/mcp \
+  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.update_userdomains","arguments":{"reason":"Sincronizacao pos-manutencao"}},"id":24}'
+```
+
+#### Addon Conversion Suite (RF04-RF09)
+- `domain.addon.list`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.list","arguments":{"username":"cpuser"}},"id":30}'
+```
+- `domain.addon.details`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.details","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser"}},"id":31}'
+```
+- `domain.addon.start_conversion` (SafetyGuard):
+```bash
+curl -s -X POST $MCP_HOST/mcp \
+  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.start_conversion","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser","new_username":"novocp","reason":"Conversao de teste automatizada"}},"id":32}'
+```
+- `domain.addon.conversion_status` / `domain.addon.conversion_details` / `domain.addon.list_conversions`: use o `conversion_id` retornado.
+
+#### DNS Authority & MX (RF14-RF16)
+- `domain.check_authority`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.check_authority","arguments":{"domain":"exemplo.com.br"}},"id":40}'
+```
+- `dns.list_mx` e `dns.add_mx` (idempotente):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.add_mx","arguments":{"domain":"exemplo.com.br","exchange":"mail.exemplo.com.br","priority":10}},"id":41}'
+```
+Repetir para ver `idempotent=true` na segunda chamada.
+
+#### DNSSEC, DS & ALIAS (RF17-RF18)
+- `domain.get_ds_records`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_ds_records","arguments":{"domains":["exemplo.com.br"]}},"id":50}'
+```
+- `dns.check_alias_available`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.check_alias_available","arguments":{"zone":"exemplo.com.br","name":"cdn"}},"id":51}'
+```
+
+#### NSEC3 Assíncrono (RF19-RF20-RF22)
+- `domain.enable_nsec3` (SafetyGuard):
+```bash
+curl -s -X POST $MCP_HOST/mcp \
+  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.enable_nsec3","arguments":{"domains":["exemplo.com.br"],"reason":"Habilitar NSEC3 para teste"}},"id":60}'
+```
+Use o `operation_id` retornado em:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_nsec3_status","arguments":{"operation_id":"<OP_ID>"}},"id":61}'
+```
+`domain.disable_nsec3` segue o mesmo fluxo.
+
+#### DNS Zone / File / Log / System
+- `dns.list_zones`, `dns.get_zone`, `dns.add_record`, `dns.edit_record` (optimistic lock), `dns.delete_record`, `dns.reset_zone`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.get_zone","arguments":{"zone":"exemplo.com.br"}},"id":70}'
+```
+- `file.list/read/write/delete`, `log.read_last_lines`, `system.get_load`, `system.restart_service`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"system.get_load","arguments":{}},"id":80}'
+```
+
+### Composed Flows (multi-step)
+
+1) **Conversão de addon com verificação e auditoria**
+   - Listar addons do usuário → obter domínio → `domain.addon.details`
+   - Iniciar conversão: `domain.addon.start_conversion` (SafetyGuard)
+   - Polling: `domain.addon.conversion_status` até `completed`
+   - Conferir detalhes finais: `domain.addon.conversion_details`
+
+2) **DNSSEC/NSEC3 seguro e observável**
+   - Checar autoridade local: `domain.check_authority`
+   - Buscar DS (fallback claro se DNSSEC não existir): `domain.get_ds_records`
+   - Habilitar NSEC3 (SafetyGuard): `domain.enable_nsec3`
+   - Polling: `domain.get_nsec3_status` até `completed`
+
+3) **Manutenção /etc/userdomains sem race condition**
+   - Rodar `domain.update_userdomains` com SafetyGuard
+   - Em seguida, `whm.list_domains` para o usuário afetado e `domain.get_all_info` paginado para validar atualização
+
+4) **MX idempotente + resolução**
+   - `dns.add_mx` duas vezes → segunda retorna `idempotent=true`
+   - `domain.resolve` para confirmar apontamento principal
+
+5) **Criação segura de subdomínio**
+   - `domain.create_subdomain` com `document_root` validado (RS03)
+   - `file.list` no docroot e `domain.resolve` para validar propagação
+
+6) **Auditabilidade e segurança**
+   - Usar cabeçalhos: `X-MCP-ACL-Token` (ex.: `root:admin`) + `X-MCP-Safety-Token`
+   - Confirmar em logs que tokens aparecem como `[REDACTED]`
 ```
 
 ### Workflow Examples
@@ -652,7 +886,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 ### Inspiration
 
 This project was inspired by [@genxis/whmrockstar](https://www.npmjs.com/package/@genxis/whmrockstar) but represents a complete rewrite with:
-- 109% more tools (23 vs 11)
+- 309% more tools (45 vs 11)
 - Enterprise security features
 - Production-ready reliability
 - Modern development tools

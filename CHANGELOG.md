@@ -7,6 +7,30 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.4.0] - 2025-12-07
+
+### Adicionado
+- **Suite de Domínios (SPEC-NOVAS-FEATURES-WHM-001)**: 22 novas tools `domain.*`/`dns.*` cobrindo usuário/owner, alias, subdomínio, resolução, autoridade local, MX, DS, ALIAS, conversões de addon e manutenção `/etc/userdomains`.
+- **Paginacao obrigatória** em `domain.get_all_info` (`limit/offset/filter`) com metadados `has_more/next_offset`.
+- **DNSSEC/NSEC3 assíncrono**: `domain.enable_nsec3` e `domain.disable_nsec3` retornam `operation_id`; `domain.get_nsec3_status` faz polling com timeout dinâmico `60s + 30s * dom` (máx 600s).
+- **Segurança reforçada**: validação de domínio (RS01), validação de `document_root` (RS03), SafetyGuard via header `X-MCP-Safety-Token` (body tem precedência) e ACL propagado (`X-MCP-ACL-Token`/`Authorization`) para root/reseller/user.
+- **Idempotência**: `dns.add_mx` evita duplicatas; `domain.create_alias`/`domain.create_subdomain` e operações MX retornam flag `idempotent` quando já existem.
+- **Lock + transaction log**: `domain.update_userdomains` usa `lock-manager` e `transaction-log` para rollback seguro; NSEC3 registra operações assíncronas.
+- **Testes**: suites automatizadas para Fase 2/3 (MX idempotente, DS/ALIAS fallback, NSEC3 timeouts) e propagação de ACL token.
+
+### Alterado
+- **Timeouts alinhados ao RNF01**: limite absoluto 600s; `withTimeout` aplicado aos endpoints WHM sensíveis (DS/ALIAS) para evitar travamentos.
+- **Contagem total de tools** atualizada para **45** (10 whm.*, 19 domain.*, 9 dns.*, 4 file/log/system).
+- **Documentação**: README/TESTING revisados com novos exemplos de NSEC3, DS/ALIAS, paginacao e cabeçalhos de segurança; changelog anterior corrigido.
+- **SafetyGuard**: suporte explícito a header, com redacão de tokens nos logs.
+
+### Corrigido
+- **DNSSEC/ALIAS**: chamadas agora retornam erro claro quando o endpoint não existe ou DNSSEC não está habilitado (em vez de timeout silencioso).
+- **ACL**: validação agora usa o token da requisição (`X-MCP-ACL-Token`/`Authorization`), impedindo uso involuntário do fallback root.
+- **MX duplicado**: `dns.add_mx` verifica registros existentes antes de criar.
+
+---
+
 ## [1.0.0] - 2025-12-07
 
 ### Adicionado
@@ -155,6 +179,6 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
-**Skills IT - Soluções em Tecnologia**
-contato@skillsit.com.br
+**Skills IT - Soluções em Tecnologia**  
+contato@skillsit.com.br  
 https://www.skillsit.com.br
