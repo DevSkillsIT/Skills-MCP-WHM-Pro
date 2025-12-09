@@ -694,11 +694,33 @@ class MCPHandler {
     try {
       // Rotear para handler apropriado
       switch (method) {
+        case 'initialize':
+          // MCP Protocol initialization handshake (obrigatório para Claude Code)
+          return {
+            jsonrpc: '2.0',
+            id,
+            result: {
+              protocolVersion: '2024-11-05',
+              serverInfo: {
+                name: 'mcp-whm-cpanel',
+                version: '1.0.0'
+              },
+              capabilities: {
+                tools: {}
+              }
+            }
+          };
+
         case 'tools/list':
           return this.handleToolsList(id);
 
         case 'tools/call':
           return await this.handleToolCall(id, params);
+
+        case 'notifications/initialized':
+        case 'initialized':
+          // MCP Protocol: confirmação de inicialização (notificação, retorna vazio)
+          return { jsonrpc: '2.0', id, result: {} };
 
         default:
           return this.errorResponse(id, -32601, 'Method not found', { method });
@@ -760,10 +782,18 @@ class MCPHandler {
     try {
       const result = await executor();
 
+      // MCP Protocol 2024-11-05: tools/call deve retornar content array
       return {
         jsonrpc: '2.0',
         id,
-        result
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(result, null, 2)
+            }
+          ]
+        }
       };
     } catch (error) {
       // Tratar erros especificos
@@ -839,12 +869,14 @@ class MCPHandler {
     switch (name) {
       case 'whm.list_accounts':
         return await withOperationTimeout(async () => {
-          const accounts = await this.whmService.listAccounts();
+          const result = await this.whmService.listAccounts();
+          // result = {success: true, data: {acct: [...]}}
+          const accounts = result?.data?.acct || [];
           return {
             success: true,
             data: {
-              accounts: accounts.acct || [],
-              total: (accounts.acct || []).length
+              accounts: accounts,
+              total: accounts.length
             }
           };
         }, 'whm.list_accounts');
