@@ -9,10 +9,27 @@
 require('dotenv').config();
 
 const express = require('express');
+const { randomUUID } = require('crypto');
 const logger = require('./lib/logger');
 const authMiddleware = require('./middleware/auth');
 const { httpMetricsMiddleware, getMetrics, getMetricsContentType } = require('./lib/metrics');
 const MCPHandler = require('./mcp-handler');
+
+// ============================================
+// Streamable HTTP Session Management (Gemini)
+// ============================================
+const mcpSessions = new Map();
+
+// Cleanup expired sessions every 60 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const [sessionId, session] of mcpSessions.entries()) {
+    if (now - session.createdAt > 15 * 60 * 1000) {
+      mcpSessions.delete(sessionId);
+      logger.debug('Session expired', { sessionId });
+    }
+  }
+}, 60000);
 
 // Criar aplicacao Express
 const app = express();
@@ -82,11 +99,70 @@ app.use(authMiddleware);
 
 // ============================================
 // Handler MCP (AC02)
+// Suporta Streamable HTTP Transport (Claude + Gemini)
+// GET = SSE, POST = JSON-RPC, DELETE = Session termination
 // ============================================
 
 const mcpHandler = new MCPHandler();
 
+// GET /mcp - SSE endpoint for server-to-client notifications (Gemini requirement)
+app.get('/mcp', (req, res) => {
+  const sessionId = req.headers['mcp-session-id'] || randomUUID();
+
+  logger.info('SSE connection opened', { sessionId });
+
+  // Set SSE headers
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Mcp-Session-Id', sessionId);
+  res.flushHeaders();
+
+  // Register session
+  mcpSessions.set(sessionId, { createdAt: Date.now(), res });
+
+  // Send initial endpoint event
+  res.write('event: endpoint\ndata: /mcp\n\n');
+
+  // Keepalive every 30 seconds
+  const keepAlive = setInterval(() => {
+    if (!res.writableEnded) {
+      res.write(':keepalive\n\n');
+    }
+  }, 30000);
+
+  // Cleanup on close
+  req.on('close', () => {
+    clearInterval(keepAlive);
+    mcpSessions.delete(sessionId);
+    logger.info('SSE connection closed', { sessionId });
+  });
+});
+
+// DELETE /mcp - Session termination (Gemini requirement)
+app.delete('/mcp', (req, res) => {
+  const sessionId = req.headers['mcp-session-id'];
+
+  if (sessionId && mcpSessions.has(sessionId)) {
+    mcpSessions.delete(sessionId);
+    logger.info('Session terminated', { sessionId });
+  }
+
+  res.status(200).json({ status: 'session_terminated', sessionId });
+});
+
+// POST /mcp - JSON-RPC handler (works for both Claude and Gemini)
 app.post('/mcp', async (req, res) => {
+  const sessionId = req.headers['mcp-session-id'] || randomUUID();
+
+  // Set session header for Streamable HTTP
+  res.setHeader('Mcp-Session-Id', sessionId);
+
+  // Register/update session
+  if (!mcpSessions.has(sessionId)) {
+    mcpSessions.set(sessionId, { createdAt: Date.now() });
+  }
+
   try {
     logger.logRequest(req);
 

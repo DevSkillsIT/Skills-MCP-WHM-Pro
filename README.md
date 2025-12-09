@@ -902,14 +902,15 @@ Built on the [Model Context Protocol](https://modelcontextprotocol.io) open stan
 - 🐛 **Bug Reports**: [GitHub Issues](https://github.com/DevSkillsIT/skills-mcp-whm-pro/issues)
 - 💬 **Discussions**: [GitHub Discussions](https://github.com/DevSkillsIT/skills-mcp-whm-pro/discussions)
 - 📧 **Email**: contato@skillsit.com.br
+- 🇧🇷 **Made In Brazil**
 
 ---
 
 <div align="center">
 
-**Made with ❤️ by Skills IT**
+**Made with ❤️ by Skills IT - Soluções em TI - BRAZIL**
 
-*Empowering MSPs with intelligent automation*
+*We are an MSP empowering other MSPs with intelligent automation.*
 
 [⬆ Back to Top](#skills-mcp-whm-pro)
 
