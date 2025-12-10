@@ -426,13 +426,50 @@ function buildToolDefinitions() {
     },
     {
       name: 'dns.get_zone',
-      description: 'Obtem dump completo da zona DNS',
+      description: 'Obtem dump completo da zona DNS com suporte a filtros e otimizacao',
       inputSchema: {
         type: 'object',
         properties: {
-          zone: { type: 'string', description: 'Nome da zona (dominio)' }
+          zone: { type: 'string', description: 'Nome da zona (dominio)' },
+          record_type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'], description: 'Filtrar por tipo de registro (opcional)' },
+          name_filter: { type: 'string', description: 'Filtrar por nome de registro (substring, opcional)' },
+          max_records: { type: 'integer', default: 500, description: 'Limitar quantidade de registros retornados (default: 500, max: 2000)' },
+          include_stats: { type: 'boolean', default: false, description: 'Incluir estatisticas de aninhamento de dominios (opcional)' }
         },
         required: ['zone']
+      }
+    },
+    {
+      name: 'dns.check_nested_domains',
+      description: 'Verifica se uma zona DNS possui muitos subdominios aninhados (comum em WHM/cPanel)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          zone: { type: 'string', description: 'Dominio a verificar (ex: skillsit.com.br)' }
+        },
+        required: ['zone']
+      }
+    },
+    {
+      name: 'dns.search_record',
+      description: 'Busca registros DNS especificos em uma zona (otimizado para economizar tokens)',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          zone: { type: 'string', description: 'Nome da zona (dominio)' },
+          name: { type: 'string', description: 'Nome do registro a buscar (ex: prometheus, www, @)' },
+          type: {
+            type: 'array',
+            items: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'] },
+            description: 'Tipos de registro a buscar (default: ["A", "AAAA"])'
+          },
+          matchMode: {
+            type: 'string',
+            enum: ['exact', 'contains', 'startsWith'],
+            description: 'Modo de correspondencia (default: exact)'
+          }
+        },
+        required: ['zone', 'name']
       }
     },
     {
@@ -1120,8 +1157,30 @@ class MCPHandler {
 
       case 'dns.get_zone':
         return await withOperationTimeout(
-          () => this.dnsService.getZone(args.zone),
+          () => this.dnsService.getZone(args.zone, {
+            record_type: args.record_type,
+            name_filter: args.name_filter,
+            max_records: args.max_records,
+            include_stats: args.include_stats
+          }),
           'dns.get_zone'
+        );
+
+      case 'dns.check_nested_domains':
+        return await withOperationTimeout(
+          () => this.dnsService.checkNestedDomains(args.zone),
+          'dns.check_nested_domains'
+        );
+
+      case 'dns.search_record':
+        return await withOperationTimeout(
+          () => this.dnsService.searchRecord(
+            args.zone,
+            args.name,
+            args.type || ['A', 'AAAA'],
+            args.matchMode || 'exact'
+          ),
+          'dns.search_record'
         );
 
       case 'dns.add_record':

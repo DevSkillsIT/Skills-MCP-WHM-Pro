@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](package.json)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-orange)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/Tools-45-success)](schemas/mcp-tools.json)
+[![Tools](https://img.shields.io/badge/Tools-48-success)](schemas/mcp-tools.json)
 
 *The most complete MCP server for WHM and cPanel automation available today*
 
@@ -85,6 +85,12 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 ---
 
 ## ✨ Features
+
+### 🔌 HTTP Streamable Protocol - MCP 2024-11-05
+- **Remote Access Support** - Access MCP server remotely via HTTP endpoint
+- **Better Security** - API key authentication via headers (more secure than env vars)
+- **Easier Debugging** - Test with curl, Postman, or any HTTP client
+- **Multi-IDE Compatible** - Works with Claude Desktop, VS Code, Cursor, Windsurf, Zed, and more
 
 ### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
 
@@ -292,6 +298,44 @@ NODE_ENV=production
 
 ## 🎮 Usage
 
+### Quick Start for IDEs
+
+#### Claude Desktop (Recommended - HTTP Streamable)
+
+1. Add to your Claude Desktop config (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "skills-whm-pro": {
+      "type": "streamable-http",
+      "url": "http://mcp.example.com:3200/mcp",
+      "headers": {
+        "x-api-key": "YOUR_API_KEY_HERE"
+      }
+    }
+  }
+}
+```
+
+2. Restart Claude Desktop
+3. Start using WHM/cPanel tools!
+
+
+#### VS Code / Continue.dev
+
+1. Install Continue extension
+2. Use template from `templates/vscode-settings.json` or `templates/continue-config.json`
+3. Configure endpoint: `http://mcp.example.com:3200/mcp`
+4. Add `x-api-key` header
+
+#### Other IDEs
+
+Configuration templates available in `/templates`:
+- **Cursor**: `cursor-config.json` (HTTP)
+- **Windsurf**: `windsurf-config.json` (HTTP)
+- **Zed**: `zed-config.json` (HTTP)
+- **JetBrains**: `jetbrains-config.xml`
+
 ### Starting the Server
 
 ```bash
@@ -308,7 +352,7 @@ pm2 start src/server.js --name mcp-whm-pro
 ### Health Check
 
 ```bash
-curl http://localhost:3100/health
+curl http://mcp.example.com:3200/health
 ```
 
 Expected response:
@@ -316,17 +360,18 @@ Expected response:
 {
   "status": "healthy",
   "service": "skills-mcp-whm-pro",
-  "version": "1.4.0",
-  "timestamp": "2025-12-07T14:00:00.000Z"
+  "version": "1.5.0",
+  "timestamp": "2025-12-10T14:00:00.000Z"
 }
 ```
 
-### Calling MCP Endpoint
+### Calling MCP Endpoint (HTTP Streamable)
 
 ```bash
 # List available tools
-curl -X POST http://localhost:3100/mcp \
+curl -X POST http://mcp.example.com:3200/mcp \
   -H 'Content-Type: application/json' \
+  -H 'x-api-key: REDACTED_API_KEY' \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/list",
@@ -352,7 +397,7 @@ curl -X POST http://localhost:3100/mcp \
 
 ---
 
-## 🛠️ Available Tools (45)
+## 🛠️ Available Tools (48)
 
 ### WHM Account Management (10)
 

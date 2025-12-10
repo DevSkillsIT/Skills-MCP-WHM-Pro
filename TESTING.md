@@ -1,6 +1,6 @@
-# TESTING.md - Guia de Testes MCP WHM/cPanel (SPEC-NOVAS-FEATURES-WHM-001 v1.4.0)
+# TESTING.md - Guia de Testes MCP WHM/cPanel (v1.5.0)
 
-Este guia cobre os testes manuais para validar as novas features de domínio/DNS (22 tools) e hardening de segurança aplicados ao MCP WHM/cPanel.
+Este guia cobre os testes manuais para validar o HTTP Streamable Protocol (MCP 2024-11-05) e as features de domínio/DNS (48 tools) com hardening de segurança.
 
 ## 0. Pré-requisitos
 
@@ -25,11 +25,11 @@ export MCP_ACL_TOKEN="root:admin"  # ou reseller:meu_reseller / user:cpaneluser
 
 ## 1. Smoke Tests
 
-### 1.1 Health
+### 1.1 Health (HTTP Streamable)
 ```bash
 curl -X GET $MCP_HOST/health
 ```
-Esperado: `status=healthy`, `service=skills-mcp-whm-pro`, `version=1.4.0`.
+Esperado: `status=healthy`, `service=skills-mcp-whm-pro`, `version=1.5.0`, `protocol=MCP 2024-11-05`.
 
 ### 1.2 Autenticação obrigatória
 ```bash
@@ -38,16 +38,22 @@ curl -X POST $MCP_HOST/mcp -H 'Content-Type: application/json' \
 ```
 Esperado: HTTP 401 (missing x-api-key).
 
-### 1.3 Tools list (45 tools)
+### 1.3 Tools list (48 tools - HTTP Streamable)
 ```bash
 curl -X POST $MCP_HOST/mcp \
-  -H "x-api-key: $MCP_API_KEY" -H 'Content-Type: application/json' \
+  -H "x-api-key: $MCP_API_KEY" \
+  -H 'Content-Type: application/json' \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
-Verificar presença de:
-- domain.* (get_user_data, get_all_info, get_owner, create_alias, create_subdomain, delete, resolve, check_authority, addon.*, ds, nsec3, update_userdomains)
-- dns.* (list_zones, get_zone, add/edit/delete/reset, list_mx, add_mx, check_alias_available)
-- whm.*, system.*, file.*, log.*
+Verificar presença de 48 tools:
+- whm.* (10 tools: account management, monitoring)
+- domain.* (19 tools: user data, owner, alias, subdomain, addon conversions, DNSSEC/NSEC3, authority)
+- dns.* (9 tools: zones, records, MX, ALIAS)
+- system.*, file.*, log.* (10 tools: server management)
+
+**Protocolo:** MCP 2024-11-05 (Streamable HTTP)
+**Endpoint:** http://mcp.example.com:3200/mcp
+**Autenticação:** x-api-key header obrigatório
 
 ---
 

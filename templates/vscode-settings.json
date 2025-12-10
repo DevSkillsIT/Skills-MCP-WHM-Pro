@@ -1,27 +1,12 @@
 {
-  "mcp.servers": {
-    "skills-whm-pro": {
-      "command": "node",
-      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
-      "env": {
-        "WHM_HOST": "https://seu-servidor-whm.com:2087",
-        "WHM_API_TOKEN": "seu-token-api-whm",
-        "MCP_PORT": "3100",
-        "MCP_SAFETY_TOKEN": "seu-token-seguranca-opcional"
-      },
-      "description": "Skills MCP WHM Pro - Enterprise WHM/cPanel Management",
-      "capabilities": {
-        "tools": true,
-        "resources": false,
-        "prompts": false
-      }
-    }
-  },
   "mcp.mcpServers": {
     "skills-whm-pro": {
-      "url": "http://localhost:3100/mcp",
+      "url": "http://mcp.example.com:3200/mcp",
       "name": "Skills WHM Pro",
-      "description": "WHM/cPanel management with 23 advanced tools"
+      "description": "WHM/cPanel management with 48 advanced tools",
+      "headers": {
+        "x-api-key": "YOUR_WHM_MCP_API_KEY_HERE"
+      }
     }
   },
   "files.associations": {
@@ -35,3 +20,14 @@
     }
   ]
 }
+
+// ⚙️  CONFIGURAÇÃO - HTTP Streamable (Seguro)
+//
+// 1. x-api-key: Copie WHM_MCP_API_KEY do arquivo .env do servidor
+//
+// 2. MCP_SAFETY_GUARD é configurado NO SERVIDOR (.env)
+//    Cliente NÃO pode desabilitar (segurança!)
+//
+// 3. Para operações destrutivas:
+//    - confirmationToken: Use MCP_SAFETY_TOKEN do .env do servidor
+//    - reason: Justificativa obrigatória (min 10 chars)

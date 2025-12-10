@@ -3,15 +3,10 @@
     "version": "2",
     "mcp_servers": {
       "skills-whm-cpanel": {
-        "command": {
-          "path": "node",
-          "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
-          "env": {
-            "WHM_API_URL": "https://seu-servidor-whm.com:2087",
-            "WHM_API_TOKEN": "seu-token-whm-aqui",
-            "MCP_PORT": "3100",
-            "LOG_LEVEL": "info",
-            "ENABLE_METRICS": "true"
+        "http": {
+          "url": "http://mcp.example.com:3200/mcp",
+          "headers": {
+            "x-api-key": "YOUR_WHM_MCP_API_KEY_HERE"
           }
         },
         "settings": {
@@ -46,8 +41,8 @@
     "context_servers": ["skills-whm-cpanel"]
   },
   "instructions": {
-    "pt-BR": "Configuração MCP para Zed Editor\n\nInstalação:\n1. Abra Zed Editor\n2. Pressione Cmd/Ctrl + Shift + P\n3. Digite 'Zed: Open Settings'\n4. Adicione este JSON na seção 'assistant'\n5. Configure WHM_API_URL e WHM_API_TOKEN\n6. Salve o arquivo settings.json\n7. Recarregue Zed (Cmd/Ctrl + R)\n\nUso:\n- Abra o Assistant Panel (Cmd/Ctrl + ?)\n- Use comandos como:\n  * 'Listar contas cPanel'\n  * 'Criar conta para exemplo.com'\n  * 'Status do servidor WHM'\n  * 'Adicionar DNS A record'\n\nTools disponíveis: 23 ferramentas\nCategorias: Account, DNS, Monitoring, Files, System\n\nDocumentação completa:\nhttps://github.com/DevSkillsIT/skills-mcp-whm-pro",
-    "en": "MCP Configuration for Zed Editor\n\nSetup:\n1. Open Zed Editor\n2. Press Cmd/Ctrl + Shift + P\n3. Type 'Zed: Open Settings'\n4. Add this JSON to 'assistant' section\n5. Configure WHM_API_URL and WHM_API_TOKEN\n6. Save settings.json file\n7. Reload Zed (Cmd/Ctrl + R)\n\nUsage:\n- Open Assistant Panel (Cmd/Ctrl + ?)\n- Use commands like:\n  * 'List cPanel accounts'\n  * 'Create account for example.com'\n  * 'WHM server status'\n  * 'Add DNS A record'\n\nAvailable tools: 23 tools\nCategories: Account, DNS, Monitoring, Files, System\n\nFull documentation:\nhttps://github.com/DevSkillsIT/skills-mcp-whm-pro"
+    "pt-BR": "Configuração MCP para Zed Editor (HTTP Streamable - RECOMENDADO)\n\nInstalação:\n1. Abra Zed Editor\n2. Pressione Cmd/Ctrl + Shift + P\n3. Digite 'Zed: Open Settings'\n4. Adicione este JSON na seção 'assistant'\n5. Salve o arquivo settings.json\n6. Recarregue Zed (Cmd/Ctrl + R)\n\nEndpoint: http://mcp.example.com:3200/mcp\nProtocolo: MCP 2024-11-05 (Streamable HTTP)\n\nUso:\n- Abra o Assistant Panel (Cmd/Ctrl + ?)\n- Use comandos como:\n  * 'Listar contas cPanel'\n  * 'Criar conta para exemplo.com'\n  * 'Status do servidor WHM'\n  * 'Adicionar DNS A record'\n\nTools disponíveis: 48 ferramentas\nCategorias: Account, DNS, Domain Management, Monitoring, Files, System\n\nLegacy stdio: Use zed-config-stdio.json\n\nDocumentação completa:\nhttps://github.com/DevSkillsIT/skills-mcp-whm-pro",
+    "en": "MCP Configuration for Zed Editor (HTTP Streamable - RECOMMENDED)\n\nSetup:\n1. Open Zed Editor\n2. Press Cmd/Ctrl + Shift + P\n3. Type 'Zed: Open Settings'\n4. Add this JSON to 'assistant' section\n5. Save settings.json file\n6. Reload Zed (Cmd/Ctrl + R)\n\nEndpoint: http://mcp.example.com:3200/mcp\nProtocol: MCP 2024-11-05 (Streamable HTTP)\n\nUsage:\n- Open Assistant Panel (Cmd/Ctrl + ?)\n- Use commands like:\n  * 'List cPanel accounts'\n  * 'Create account for example.com'\n  * 'WHM server status'\n  * 'Add DNS A record'\n\nAvailable tools: 48 tools\nCategories: Account, DNS, Domain Management, Monitoring, Files, System\n\nLegacy stdio: Use zed-config-stdio.json\n\nFull documentation:\nhttps://github.com/DevSkillsIT/skills-mcp-whm-pro"
   },
   "metadata": {
     "name": "Skills MCP WHM Pro",

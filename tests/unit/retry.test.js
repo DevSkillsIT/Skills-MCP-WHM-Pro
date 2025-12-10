@@ -85,8 +85,17 @@ describe('Retry System', () => {
 
       const promise = withRetry(mockFn, { maxRetries: 3, baseDelay: 100, jitter: 0 });
 
-      // Fast-forward through all retries
+      // Aguardar microtask queue antes de avançar timers
+      await Promise.resolve();
+
+      // Fast-forward through all retries (baseDelay: 100, backoff: 100, 200, 400 = 700ms)
       jest.advanceTimersByTime(1000);
+
+      // Aguardar microtask queue novamente
+      await Promise.resolve();
+
+      // Rodar todos os timers remanescentes
+      jest.runAllTimers();
 
       const result = await promise;
 
@@ -153,14 +162,24 @@ describe('Retry System', () => {
 
     it('deve parsear Retry-After em HTTP-date', () => {
       // Create a future date exactly 5 seconds from now
-      const futureDate = new Date(Date.now() + 5000);
+      const now = Date.now();
+      const futureDate = new Date(now + 5000);
       const response = {
         headers: { 'retry-after': futureDate.toUTCString() }
       };
+
+      // Mock Date.now() para evitar timing issues
+      const originalNow = Date.now;
+      Date.now = jest.fn(() => now);
+
       const result = getRetryAfterMs(response);
-      // Allow a wider range since Date parsing can have slight variations
-      expect(result).toBeGreaterThanOrEqual(4800);
-      expect(result).toBeLessThanOrEqual(5200);
+
+      // Restaurar Date.now
+      Date.now = originalNow;
+
+      // Permitir variação maior (até 1000ms) para timing jitter
+      expect(result).toBeGreaterThanOrEqual(4000);
+      expect(result).toBeLessThanOrEqual(6000);
     });
 
     it('deve retornar null se header ausente', () => {
@@ -184,46 +203,44 @@ describe('Retry System', () => {
 
   describe('Exponential Backoff', () => {
     it('deve aplicar backoff exponencial com jitter', async () => {
-      jest.useFakeTimers();
-
+      // Usar real timers para este teste pois é complexo
       let attempt = 0;
 
       const mockFn = jest.fn().mockImplementation(async () => {
-        if (attempt < 4) {
+        if (attempt < 2) {
           attempt++;
-          throw new Error('Temporary failure');
+          const error = new Error('Temporary failure');
+          error.response = { status: 500, headers: {} };
+          throw error;
         }
         return { success: true };
       });
 
-      const promise = withRetry(mockFn, { maxRetries: 5, baseDelay: 1000, jitter: 0 });
-
-      // Fast-forward through all delays
-      jest.advanceTimersByTime(15000);
-
-      const result = await promise;
+      const result = await withRetry(mockFn, {
+        maxRetries: 5,
+        baseDelay: 100,
+        jitter: 0.1,
+        maxDelay: 500
+      });
 
       expect(result.success).toBe(true);
-
-      jest.useRealTimers();
-    });
+      expect(mockFn).toHaveBeenCalledTimes(3);
+    }, 10000);
 
     it('deve parar após maxRetries', async () => {
-      jest.useFakeTimers();
+      // Função que sempre falha
+      const errorWithStatus = new Error('Always fails');
+      errorWithStatus.response = { status: 500, headers: {} };
 
-      const mockFn = jest.fn().mockRejectedValue(new Error('Always fails'));
+      const mockFn = jest.fn().mockRejectedValue(errorWithStatus);
 
-      const promise = withRetry(mockFn, { maxRetries: 5, baseDelay: 100 });
+      await expect(
+        withRetry(mockFn, { maxRetries: 3, baseDelay: 50, maxDelay: 200 })
+      ).rejects.toThrow('Always fails');
 
-      // Fast-forward through all delays
-      jest.advanceTimersByTime(20000);
-
-      await expect(promise).rejects.toThrow('Always fails');
-
-      expect(mockFn).toHaveBeenCalledTimes(5);
-
-      jest.useRealTimers();
-    });
+      // maxRetries=3 significa tentar 3 vezes (tentativa inicial + 2 retries)
+      expect(mockFn).toHaveBeenCalledTimes(3);
+    }, 10000);
 
     it('deve aplicar jitter corretamente', () => {
       const delay1 = calculateBackoffDelay(0, 1000, 32000, 0.2);

@@ -1,23 +1,17 @@
 {
   "mcpServers": {
     "skills-whm-pro": {
-      "command": "node",
-      "args": ["/opt/mcp-servers/whm-cpanel/src/server.js"],
-      "env": {
-        "WHM_HOST": "https://seu-servidor-whm.com:2087",
-        "WHM_API_TOKEN": "seu-token-api-whm",
-        "MCP_PORT": "3100",
-        "MCP_SAFETY_TOKEN": "seu-token-seguranca-opcional",
-        "WHM_TIMEOUT": "30000",
-        "RETRY_MAX_ATTEMPTS": "3",
-        "RETRY_INITIAL_DELAY": "1000"
+      "type": "streamable-http",
+      "url": "http://mcp.example.com:3200/mcp",
+      "headers": {
+        "x-api-key": "YOUR_WHM_MCP_API_KEY_HERE"
       },
       "metadata": {
         "name": "Skills MCP WHM Pro",
-        "version": "1.0.0",
-        "description": "Enterprise-grade MCP Server for WHM/cPanel management with 23 tools",
+        "version": "1.5.0",
+        "description": "Enterprise-grade MCP Server for WHM/cPanel management with 48 tools",
         "author": "Skills IT - Soluções em Tecnologia",
-        "homepage": "https://github.com/skills-it/skills-mcp-whm-pro"
+        "homepage": "https://github.com/DevSkillsIT/skills-mcp-whm-pro"
       },
       "capabilities": {
         "tools": true,
@@ -26,7 +20,9 @@
         "logging": true
       },
       "features": [
-        "Advanced DNS management with optimistic locking",
+        "HTTP Streamable Protocol (MCP 2024-11-05)",
+        "Advanced DNS management with cache and optimization",
+        "Domain management suite (48 tools total)",
         "Safety Guard system preventing accidental data loss",
         "Configurable timeouts and retry logic",
         "Path validation preventing directory traversal",

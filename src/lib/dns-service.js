@@ -13,6 +13,13 @@ const logger = require('./logger');
 const { withTimeout, getTimeoutByType } = require('./timeout');
 const { dnsOperationDuration, dnsBackupsCreated, dnsRollbacks } = require('./metrics');
 
+// Importar helpers DNS
+const { parseZoneRecords, extractRecordsByType, extractRecordsByName } = require('./dns-helpers/parser');
+const { detectNestedDomains, generateOptimizationSuggestions } = require('./dns-helpers/nested-domain-detector');
+const { limitRecords, estimateTokenSize } = require('./dns-helpers/response-optimizer');
+const { validateDomainName, validateRecordType } = require('./dns-helpers/validators');
+const dnsCache = require('./dns-cache');
+
 // Diretorio de backups DNS
 const DNS_BACKUP_DIR = '/tmp/dns-backups';
 const MAX_BACKUPS_PER_ZONE = 10;
@@ -287,40 +294,121 @@ class DNSService {
   }
 
   /**
-   * Tool: dns.get_zone (AC07)
-   * Obtem dump completo da zona
+   * Tool: dns.get_zone (AC07) - MODIFICADO
+   * Obtem dump completo da zona com suporte a filtros e cache
+   *
+   * @param {string} zone - Nome da zona
+   * @param {object} options - Opções (record_type, name_filter, max_records, include_stats)
+   * @returns {object} Dados da zona
    */
-  async getZone(zone) {
+  async getZone(zone, options = {}) {
     const startTime = process.hrtime();
 
     try {
+      // Validar zona
+      const validatedZone = validateDomainName(zone);
+
+      // Extrair opções
+      const {
+        record_type = null,
+        name_filter = null,
+        max_records = 500,
+        include_stats = false
+      } = options;
+
+      // Gerar chave de cache
+      const cacheKey = dnsCache.generateKey(validatedZone, 'get_zone', {
+        record_type,
+        name_filter,
+        max_records
+      });
+
+      // Tentar obter do cache
+      const cached = dnsCache.get(cacheKey);
+      if (cached) {
+        logger.debug('Returning cached zone data', { zone: validatedZone });
+        return cached;
+      }
+
+      // Buscar zona da WHM API
       const result = await withTimeout(
-        () => this.whm.getZone(zone),
+        () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
         'dns.get_zone'
       );
 
       // Verificar se zona existe
       if (!result.data?.zone?.[0]) {
-        throw new ZoneNotFoundError(zone);
+        throw new ZoneNotFoundError(validatedZone);
       }
 
       const zoneData = result.data.zone[0];
-      const records = this.parseZoneRecords(zoneData);
+      let records = parseZoneRecords(zoneData);
 
+      // Estatísticas de aninhamento (se solicitado)
+      let stats = null;
+      if (include_stats) {
+        stats = detectNestedDomains(records, validatedZone);
+      }
+
+      // Aplicar filtros
+
+      // Filtro por tipo de registro
+      if (record_type) {
+        const normalizedType = validateRecordType(record_type);
+        records = extractRecordsByType(records, normalizedType);
+      }
+
+      // Filtro por nome
+      if (name_filter) {
+        records = extractRecordsByName(records, name_filter, 'contains');
+      }
+
+      // Limitar quantidade de registros
+      const limited = limitRecords(records, max_records);
+
+      // Preparar resposta
+      const response = {
+        success: true,
+        data: {
+          zone: validatedZone,
+          records: limited.records,
+          totalRecords: limited.originalCount,
+          returnedRecords: limited.returnedCount,
+          appliedFilters: {
+            record_type: record_type || null,
+            name_filter: name_filter || null,
+            max_records: max_records
+          }
+        }
+      };
+
+      // Adicionar warning se zona foi limitada
+      if (limited.warning) {
+        response.data.warning = limited.warning;
+      }
+
+      // Adicionar estatísticas se solicitado
+      if (include_stats && stats) {
+        response.data.stats = stats;
+
+        // Adicionar sugestões se zona requer otimização
+        if (stats.warning) {
+          response.data.suggestions = generateOptimizationSuggestions(stats);
+        }
+      }
+
+      // Métricas
       const [seconds, nanoseconds] = process.hrtime(startTime);
       dnsOperationDuration.observe(
         { operation: 'get_zone', status: 'success' },
         seconds + nanoseconds / 1e9
       );
 
-      return {
-        success: true,
-        data: {
-          zone: zone,
-          records: records
-        }
-      };
+      // Armazenar em cache
+      dnsCache.set(cacheKey, response);
+
+      return response;
     } catch (error) {
       if (error instanceof ZoneNotFoundError) {
         throw error;
@@ -612,6 +700,9 @@ class DNSService {
         seconds + nanoseconds / 1e9
       );
 
+      // Invalidar cache da zona
+      dnsCache.invalidatePattern(zone);
+
       return {
         success: true,
         data: {
@@ -630,6 +721,195 @@ class DNSService {
       const [seconds, nanoseconds] = process.hrtime(startTime);
       dnsOperationDuration.observe(
         { operation: 'reset_zone', status: 'error' },
+        seconds + nanoseconds / 1e9
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Tool: dns.check_nested_domains (NOVA)
+   * Verifica se uma zona DNS possui muitos subdomínios aninhados
+   *
+   * @param {string} zone - Nome da zona
+   * @returns {object} Análise de aninhamento
+   */
+  async checkNestedDomains(zone) {
+    const startTime = process.hrtime();
+
+    try {
+      // Validar zona
+      const validatedZone = validateDomainName(zone);
+
+      // Gerar chave de cache
+      const cacheKey = dnsCache.generateKey(validatedZone, 'check_nested');
+
+      // Tentar obter do cache
+      const cached = dnsCache.get(cacheKey);
+      if (cached) {
+        logger.debug('Returning cached nested domains analysis', { zone: validatedZone });
+        return cached;
+      }
+
+      // Buscar zona (sem cache para ter dados frescos da análise)
+      const result = await withTimeout(
+        () => this.whm.getZone(validatedZone),
+        getTimeoutByType('DNS'),
+        'dns.check_nested_domains'
+      );
+
+      // Verificar se zona existe
+      if (!result.data?.zone?.[0]) {
+        throw new ZoneNotFoundError(validatedZone);
+      }
+
+      const zoneData = result.data.zone[0];
+      const records = parseZoneRecords(zoneData);
+
+      // Detectar domínios aninhados
+      const analysis = detectNestedDomains(records, validatedZone);
+
+      // Gerar sugestões de otimização
+      const suggestions = generateOptimizationSuggestions(analysis);
+
+      // Preparar resposta
+      const response = {
+        success: true,
+        data: {
+          ...analysis,
+          suggestions: suggestions.length > 0 ? suggestions : undefined
+        }
+      };
+
+      // Métricas
+      const [seconds, nanoseconds] = process.hrtime(startTime);
+      dnsOperationDuration.observe(
+        { operation: 'check_nested_domains', status: 'success' },
+        seconds + nanoseconds / 1e9
+      );
+
+      // Armazenar em cache
+      dnsCache.set(cacheKey, response);
+
+      return response;
+    } catch (error) {
+      if (error instanceof ZoneNotFoundError) {
+        throw error;
+      }
+
+      const [seconds, nanoseconds] = process.hrtime(startTime);
+      dnsOperationDuration.observe(
+        { operation: 'check_nested_domains', status: 'error' },
+        seconds + nanoseconds / 1e9
+      );
+      throw error;
+    }
+  }
+
+  /**
+   * Tool: dns.search_record (NOVA)
+   * Busca registros DNS específicos em uma zona (OTIMIZADO para economizar tokens)
+   *
+   * @param {string} zone - Nome da zona
+   * @param {string} name - Nome do registro
+   * @param {Array} type - Tipos de registro (default: ['A', 'AAAA'])
+   * @param {string} matchMode - Modo de correspondência ('exact', 'contains', 'startsWith')
+   * @returns {object} Registros encontrados
+   */
+  async searchRecord(zone, name, type = ['A', 'AAAA'], matchMode = 'exact') {
+    const startTime = process.hrtime();
+
+    try {
+      // Validar zona e nome
+      const validatedZone = validateDomainName(zone);
+
+      if (!name || typeof name !== 'string') {
+        throw new Error('Nome do registro é obrigatório');
+      }
+
+      // Validar tipos de registro
+      const types = Array.isArray(type) ? type : [type];
+      const validatedTypes = types.map(t => validateRecordType(t));
+
+      // Validar match mode
+      const validModes = ['exact', 'contains', 'startsWith'];
+      if (!validModes.includes(matchMode)) {
+        throw new Error(`Match mode inválido: ${matchMode}. Valores válidos: ${validModes.join(', ')}`);
+      }
+
+      // Gerar chave de cache
+      const cacheKey = dnsCache.generateKey(validatedZone, 'search_record', {
+        name,
+        type: validatedTypes,
+        matchMode
+      });
+
+      // Tentar obter do cache
+      const cached = dnsCache.get(cacheKey);
+      if (cached) {
+        logger.debug('Returning cached search results', { zone: validatedZone, name });
+        return cached;
+      }
+
+      // Buscar zona
+      const result = await withTimeout(
+        () => this.whm.getZone(validatedZone),
+        getTimeoutByType('DNS'),
+        'dns.search_record'
+      );
+
+      // Verificar se zona existe
+      if (!result.data?.zone?.[0]) {
+        throw new ZoneNotFoundError(validatedZone);
+      }
+
+      const zoneData = result.data.zone[0];
+      const allRecords = parseZoneRecords(zoneData);
+
+      // Filtrar por nome
+      let matches = extractRecordsByName(allRecords, name, matchMode);
+
+      // Filtrar por tipo
+      matches = extractRecordsByType(matches, validatedTypes);
+
+      // Preparar resposta
+      const response = {
+        success: true,
+        data: {
+          zone: validatedZone,
+          searchCriteria: {
+            name,
+            types: validatedTypes,
+            matchMode
+          },
+          found: matches.length > 0,
+          matches,
+          totalScanned: allRecords.length,
+          message: matches.length > 0
+            ? `Encontrados ${matches.length} registro(s) correspondentes`
+            : `Nenhum registro encontrado com o nome '${name}'`
+        }
+      };
+
+      // Métricas
+      const [seconds, nanoseconds] = process.hrtime(startTime);
+      dnsOperationDuration.observe(
+        { operation: 'search_record', status: 'success' },
+        seconds + nanoseconds / 1e9
+      );
+
+      // Armazenar em cache
+      dnsCache.set(cacheKey, response);
+
+      return response;
+    } catch (error) {
+      if (error instanceof ZoneNotFoundError) {
+        throw error;
+      }
+
+      const [seconds, nanoseconds] = process.hrtime(startTime);
+      dnsOperationDuration.observe(
+        { operation: 'search_record', status: 'error' },
         seconds + nanoseconds / 1e9
       );
       throw error;

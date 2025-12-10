@@ -7,6 +7,41 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.5.0] - 2025-12-10
+
+### Adicionado
+- 🔌 **HTTP Streamable Protocol** - Suporte completo ao MCP 2024-11-05
+- 🛠️ 3 novas tools de domínio: `domain_addon_conversion_status`, `domain_check_authority`, `domain_update_userdomains`
+- 📊 **DNS Cache System** - Redução de 25k+ tokens para ~2k em zonas grandes
+- 🔍 **Nested Domain Detector** - Detecção automática de subdomínios aninhados
+- 📈 **Response Optimizer** - Paginação, compressão e estimativa de tokens
+- 🧪 **651 testes** passando (100%) com 58.89% de cobertura
+
+### Modificado
+- ✅ Templates atualizados para HTTP Streamable (Claude Desktop, VS Code, Cursor, Windsurf, Zed)
+- ✅ Endpoint padrão: `http://mcp.example.com:3200/mcp`
+- ✅ Autenticação via header `x-api-key` (mais seguro que env vars)
+- ✅ Porta padrão: 3200 (consistente em todos os templates)
+- ✅ Total de 48 tools (incremento de 3 tools)
+
+### Corrigido
+- 🐛 Timeout em consultas DNS de zonas grandes (skillsit.com.br)
+- 🐛 Memory leaks em suite de testes (setup.js global)
+- 🐛 Inconsistência de portas entre templates (3100 vs 3200)
+
+### Documentação
+- 📝 README atualizado com 48 tools e HTTP protocol
+- 📝 TESTING atualizado com curl examples HTTP
+- 📝 Documentação técnica em `/docs` (MELHORIAS-DNS, IMPLEMENTATION, etc)
+
+### Técnico
+- 🏗️ Arquitetura DNS modular: `dns-constants/`, `dns-helpers/`
+- 🧰 Bibliotecas de suporte: cache, validators, parsers, optimizers
+- 🔐 Safety guard com confirmação em operações destrutivas
+- 📊 Métricas: 48 tools, 1357 linhas no handler, 4 helpers DNS
+
+---
+
 ## [1.4.0] - 2025-12-07
 
 ### Adicionado
