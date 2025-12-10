@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](package.json)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-orange)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/Tools-48-success)](schemas/mcp-tools.json)
+[![Tools](https://img.shields.io/badge/Tools-47-success)](schemas/mcp-tools.json)
 
 *The most complete MCP server for WHM and cPanel automation available today*
 
@@ -62,7 +62,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 | Feature | Skills MCP WHM Pro | whmrockstar | Others |
 |---------|-------------------|-------------|--------|
-| **Total Tools** | ✅ 45 tools | ⚠️ 11 tools | ❌ Limited |
+| **Total Tools** | ✅ 47 tools | ⚠️ 11 tools | ❌ Limited |
 | **DNS Optimistic Locking** | ✅ Yes | ❌ No | ❌ No |
 | **Safety Guard System** | ✅ Yes | ❌ No | ❌ No |
 | **Configurable Timeouts** | ✅ Yes | ⚠️ Fixed | ❌ No |
@@ -76,7 +76,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ### What Makes Us Different
 
-1. **+309% More Tools** - 45 tools vs 11 in whmrockstar
+1. **+327% More Tools** - 47 tools vs 11 in whmrockstar
 2. **Production-Ready** - Battle-tested in real MSP environments
 3. **Security-First** - Multiple layers of protection against data loss
 4. **Developer-Friendly** - Complete schemas, CLI tools, and IDE integration
@@ -397,7 +397,7 @@ curl -X POST http://localhost:3100/mcp \
 
 ---
 
-## 🛠️ Available Tools (48)
+## 🛠️ Available Tools (47)
 
 ### WHM Account Management (10)
 
@@ -461,12 +461,14 @@ curl -X POST http://localhost:3100/mcp \
 | `dns.add_mx` | Add MX (idempotent, validates priority) | Write |
 | `dns.check_alias_available` | Check ALIAS availability (clear error if unsupported) | Read-only |
 
-### DNS Zone Management (6)
+### DNS Zone Management (8)
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
 | `dns.list_zones` | List all DNS zones | Read-only |
 | `dns.get_zone` | Get complete zone records | Read-only |
+| `dns.check_nested_domains` | Check if zone has many nested subdomains | Read-only |
+| `dns.search_record` | Search specific DNS records in zone (token-optimized) | Read-only |
 | `dns.add_record` | Add DNS record to zone | Write |
 | `dns.edit_record` | Edit existing DNS record (optimistic lock) | Write |
 | `dns.delete_record` | Delete DNS record | Destructive ⚠️ |
@@ -518,7 +520,7 @@ npx skills-whm-mcp help
 ### Example Output: introspect
 
 ```
-Available MCP Tools (45 total):
+Available MCP Tools (47 total):
 
  1. whm.list_accounts      - List all cPanel accounts on the WHM server...
  2. whm.create_account     - Create a new cPanel account with specified...
@@ -603,6 +605,8 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Edit the A record for api.exemplo.com.br to 198.51.100.10 using optimistic lock"
 "Reset the DNS zone for lab.exemplo.com.br after taking a backup"
 "Delete the CNAME for old.exemplo.com.br with SafetyGuard token"
+"Check if skillsit.com.br has nested subdomains structure"
+"Search for www record in example.com zone with exact match"
 ```
 
 #### Monitoring
@@ -628,6 +632,8 @@ Skills MCP WHM Pro is designed to work with natural language:
 "List addon domains for cpuser and get details of blog.cpuser.com"
 "Create a subdomain api.example.com under cpuser with document root /home/cpuser/api"
 "Check alias availability for www.example.com in zone example.com before creating it"
+"Check if client zone has too many nested subdomains causing DNS issues"
+"Search for a specific mail record in zone without loading all records"
 
 ### Curl Examples by Tool (quick copy/paste)
 
@@ -760,6 +766,16 @@ curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.get_zone","arguments":{"zone":"exemplo.com.br"}},"id":70}'
+```
+- `dns.check_nested_domains`:
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.check_nested_domains","arguments":{"zone":"skillsit.com.br"}},"id":71}'
+```
+- `dns.search_record` (exact match):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.search_record","arguments":{"zone":"exemplo.com.br","name":"www","type":["A","AAAA"],"matchMode":"exact"}},"id":72}'
 ```
 - `file.list/read/write/delete`, `log.read_last_lines`, `system.get_load`, `system.restart_service`:
 ```bash
@@ -931,7 +947,7 @@ This project is licensed under the MIT License - see [LICENSE](LICENSE) file for
 ### Inspiration
 
 This project was inspired by [@genxis/whmrockstar](https://www.npmjs.com/package/@genxis/whmrockstar) but represents a complete rewrite with:
-- 309% more tools (45 vs 11)
+- 327% more tools (47 vs 11)
 - Enterprise security features
 - Production-ready reliability
 - Modern development tools
