@@ -131,21 +131,22 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ---
 
-> 💼 **Precisa de Ajuda com WHM/cPanel ou IA?**
+> 💼 **Need Help with WHM/cPanel or AI?**
 >
-> A **Skills IT - Soluções em Tecnologia** é especialista em infraestrutura de TI e domina profundamente **WHM e cPanel**. Nossa equipe possui expertise em **Inteligência Artificial** e **Model Context Protocol (MCP)**, oferecendo soluções completas para automação e integração de sistemas.
+> **Skills IT - Technology Solutions** specializes in IT infrastructure and has deep expertise in **WHM and cPanel**. Our team has expertise in **Artificial Intelligence** and **Model Context Protocol (MCP)**, offering complete solutions for automation and system integration.
 >
-> **Nossos Serviços:**
-> - ✅ Consultoria e implementação WHM/cPanel
-> - ✅ Desenvolvimento de MCPs customizados para sua infraestrutura
-> - ✅ Integração de IA com sistemas corporativos
-> - ✅ Automação de gestão de hospedagem e DNS
-> - ✅ Treinamento e suporte especializado
+> **Our Services:**
+> - ✅ WHM/cPanel consulting and implementation
+> - ✅ Custom MCP development for your infrastructure
+> - ✅ AI integration with corporate systems
+> - ✅ Hosting and DNS management automation
+> - ✅ Specialized training and support
 >
-> 📞 **WhatsApp/Telefone:** (63) 3224-4925 - Brasil
-> 🌐 **Website:** skillsit.com.br 📧 **Email:** contato@skillsit.com.br
+> 📞 **WhatsApp/Phone:** +55 63 3224-4925 - Brazil 🇧🇷
+> 🌐 **Website:** [skillsit.com.br](https://skillsit.com.br)
+> 📧 **Email:** contato@skillsit.com.br
 >
-> *"Transformando infraestrutura em inteligência"*
+> *"Transforming infrastructure into intelligence"*
 
 ---
 
