@@ -91,6 +91,20 @@ app.get('/metrics', async (req, res) => {
 });
 
 // ============================================
+// OAuth Discovery (para LibreChat/MCP 2024-11-05)
+// Responde 404 indicando que OAuth NAO e necessario
+// Isso permite que clientes MCP usem autenticacao via header
+// ============================================
+
+app.get('/.well-known/oauth-protected-resource', (req, res) => {
+  res.status(404).json({ error: 'OAuth not required', message: 'Use x-api-key header' });
+});
+
+app.get('/.well-known/oauth-protected-resource/*', (req, res) => {
+  res.status(404).json({ error: 'OAuth not required', message: 'Use x-api-key header' });
+});
+
+// ============================================
 // Autenticacao (CC-01)
 // Aplicar em todos os endpoints apos este ponto
 // ============================================

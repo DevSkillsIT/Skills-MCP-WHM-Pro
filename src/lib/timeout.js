@@ -26,35 +26,35 @@ const TIMEOUT_CONFIG = {
 // Mapeamento de operacoes para tipos de timeout
 const OPERATION_TIMEOUT_MAP = {
   // WHM API
-  'whm.list_accounts': 'WHM_API',
-  'whm.create_account': 'WHM_API',
-  'whm.suspend_account': 'WHM_API',
-  'whm.unsuspend_account': 'WHM_API',
-  'whm.terminate_account': 'WHM_API',
-  'whm.get_account_summary': 'WHM_API',
-  'whm.server_status': 'WHM_API',
-  'whm.service_status': 'WHM_API',
-  'whm.restart_service': 'WHM_API',
-  'whm.list_domains': 'WHM_API',
+  'whm_list_accounts': 'WHM_API',
+  'whm_create_account': 'WHM_API',
+  'whm_suspend_account': 'WHM_API',
+  'whm_unsuspend_account': 'WHM_API',
+  'whm_terminate_account': 'WHM_API',
+  'whm_get_account_summary': 'WHM_API',
+  'whm_server_status': 'WHM_API',
+  'whm_service_status': 'WHM_API',
+  'whm_restart_service': 'WHM_API',
+  'whm_list_domains': 'WHM_API',
 
   // DNS
-  'dns.list_zones': 'DNS',
-  'dns.get_zone': 'DNS',
-  'dns.add_record': 'DNS',
-  'dns.edit_record': 'DNS',
-  'dns.delete_record': 'DNS',
-  'dns.reset_zone': 'DNS',
+  'dns_list_zones': 'DNS',
+  'dns_get_zone': 'DNS',
+  'dns_add_record': 'DNS',
+  'dns_edit_record': 'DNS',
+  'dns_delete_record': 'DNS',
+  'dns_reset_zone': 'DNS',
 
   // SSH
-  'system.restart_service': 'SSH',
-  'system.get_load': 'SSH',
-  'log.read_last_lines': 'SSH',
+  'system_restart_service': 'SSH',
+  'system_get_load': 'SSH',
+  'log_read_last_lines': 'SSH',
 
   // File
-  'file.list': 'FILE',
-  'file.read': 'FILE',
-  'file.write': 'FILE',
-  'file.delete': 'FILE'
+  'file_list': 'FILE',
+  'file_read': 'FILE',
+  'file_write': 'FILE',
+  'file_delete': 'FILE'
 };
 
 /**

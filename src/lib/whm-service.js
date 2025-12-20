@@ -505,8 +505,9 @@ class WHMService {
    * - BUG-IMP-01: Default limit=100 (não 10), max=1000 (não 100)
    * - BUG-IMP-01: Usar enum de filtro ao invés de search livre
    * - BUG-IMP-01: Retornar metadados de paginação completos (RNF07)
+   * - FEATURE: domainFilter para filtrar por nome de domínio (substring, case-insensitive)
    */
-  async getAllDomainInfo(limit = 100, offset = 0, filter = null) {
+  async getAllDomainInfo(limit = 100, offset = 0, filter = null, domainFilter = null) {
     // BUG-IMP-01: Max 1000, não 100
     const safeLimit = Math.max(1, Math.min(limit, 1000));
     const safeOffset = Math.max(0, offset);
@@ -522,8 +523,21 @@ class WHMService {
     }
 
     const result = await this.get('get_domain_info', params);
-    const domains = result.data?.domains || result.data || [];
-    const total = result.data?.total || result.total || domains.length;
+    let domains = result.data?.domains || result.data || [];
+    let total = result.data?.total || result.total || domains.length;
+
+    // FEATURE: Filtrar por nome de domínio (substring, case-insensitive)
+    if (domainFilter && typeof domainFilter === 'string' && domainFilter.trim()) {
+      const filterLower = domainFilter.trim().toLowerCase();
+      domains = domains.filter(d => {
+        // Verificar em múltiplos campos que podem conter o nome do domínio
+        const domainName = (d.domain || d.name || '').toLowerCase();
+        const docRoot = (d.documentroot || d.docroot || '').toLowerCase();
+        return domainName.includes(filterLower) || docRoot.includes(filterLower);
+      });
+      // Atualizar total após filtragem
+      total = domains.length;
+    }
 
     // BUG-IMP-01: Retornar metadados de paginação conforme RNF07
     return {
@@ -535,7 +549,8 @@ class WHMService {
           limit: safeLimit,
           offset: safeOffset,
           has_more: (safeOffset + domains.length) < total,
-          next_offset: (safeOffset + domains.length) < total ? safeOffset + safeLimit : null
+          next_offset: (safeOffset + domains.length) < total ? safeOffset + safeLimit : null,
+          filtered_by: domainFilter || null
         }
       }
     };

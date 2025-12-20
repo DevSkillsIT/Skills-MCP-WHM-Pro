@@ -275,7 +275,7 @@ function validateUsername(username) {
 ### Test Structure
 
 ```javascript
-describe('Tool: whm.create_account', () => {
+describe('Tool: whm_create_account', () => {
   describe('Input Validation', () => {
     it('should reject invalid username', () => {
       // Test
@@ -359,7 +359,7 @@ When adding new features, update:
 1. Add to `schemas/mcp-tools.json`:
 ```json
 {
-  "name": "whm.new_tool",
+  "name": "whm_new_tool",
   "description": "Clear description of what this tool does",
   "inputSchema": {
     "type": "object",
@@ -382,7 +382,7 @@ When adding new features, update:
   "category": "Account Management",
   "title": "Example usage of new tool",
   "prompt": "Natural language example",
-  "tool": "whm.new_tool",
+  "tool": "whm_new_tool",
   "parameters": { "param1": "value" },
   "expected_output": "Description of expected result"
 }

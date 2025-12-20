@@ -91,8 +91,8 @@
   },
 
   "tools": {
-    "dns.list_zones": {
-      "name": "dns.list_zones",
+    "dns_list_zones": {
+      "name": "dns_list_zones",
       "description": "Lista todas as zonas DNS do servidor",
       "inputSchema": {
         "type": "object",
@@ -101,8 +101,8 @@
       }
     },
 
-    "dns.get_zone": {
-      "name": "dns.get_zone",
+    "dns_get_zone": {
+      "name": "dns_get_zone",
       "description": "Obtem dump completo da zona DNS",
       "inputSchema": {
         "type": "object",
@@ -113,8 +113,8 @@
       }
     },
 
-    "dns.add_record": {
-      "name": "dns.add_record",
+    "dns_add_record": {
+      "name": "dns_add_record",
       "description": "Adiciona registro DNS na zona",
       "inputSchema": {
         "type": "object",
@@ -161,8 +161,8 @@
       }
     },
 
-    "dns.edit_record": {
-      "name": "dns.edit_record",
+    "dns_edit_record": {
+      "name": "dns_edit_record",
       "description": "Edita registro DNS existente com suporte a optimistic locking",
       "inputSchema": {
         "type": "object",
@@ -183,8 +183,8 @@
       }
     },
 
-    "dns.delete_record": {
-      "name": "dns.delete_record",
+    "dns_delete_record": {
+      "name": "dns_delete_record",
       "description": "Remove registro DNS da zona",
       "inputSchema": {
         "type": "object",
@@ -197,8 +197,8 @@
       }
     },
 
-    "dns.reset_zone": {
-      "name": "dns.reset_zone",
+    "dns_reset_zone": {
+      "name": "dns_reset_zone",
       "description": "Reseta zona para configuracao padrao",
       "inputSchema": {
         "type": "object",

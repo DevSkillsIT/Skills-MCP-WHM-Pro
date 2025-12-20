@@ -19,7 +19,7 @@ export MCP_SAFETY_TOKEN="CHANGE_ME_CONFIRMATION"
 export MCP_ACL_TOKEN="root:admin"  # ou reseller:meu_reseller / user:cpaneluser
 ```
 
-> ⚠️ **SafetyGuard**: domain.delete, domain.addon.start_conversion, domain.enable_nsec3, domain.disable_nsec3, domain.update_userdomains, dns.delete_record e file.delete exigem token + `reason` (>=10 chars).
+> ⚠️ **SafetyGuard**: domain_delete, domain_addon_start_conversion, domain_enable_nsec3, domain_disable_nsec3, domain_update_userdomains, dns_delete_record e file_delete exigem token + `reason` (>=10 chars).
 
 ---
 
@@ -46,10 +46,10 @@ curl -X POST $MCP_HOST/mcp \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
 Verificar presença de 48 tools:
-- whm.* (10 tools: account management, monitoring)
-- domain.* (19 tools: user data, owner, alias, subdomain, addon conversions, DNSSEC/NSEC3, authority)
-- dns.* (9 tools: zones, records, MX, ALIAS)
-- system.*, file.*, log.* (10 tools: server management)
+- whm_* (10 tools: account management, monitoring)
+- domain_* (19 tools: user data, owner, alias, subdomain, addon conversions, DNSSEC/NSEC3, authority)
+- dns_* (9 tools: zones, records, MX, ALIAS)
+- system_*, file_*, log_* (10 tools: server management)
 
 **Protocolo:** MCP 2024-11-05 (Streamable HTTP)
 **Endpoint:** http://mcp.example.com:3200/mcp
@@ -59,25 +59,25 @@ Verificar presença de 48 tools:
 
 ## 2. Domínio – Informação (RF01-RF03, RNF07)
 
-### 2.1 domain.get_user_data
+### 2.1 domain_get_user_data
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_user_data","arguments":{"domain":"exemplo.com.br"}},"id":10}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_user_data","arguments":{"domain":"exemplo.com.br"}},"id":10}'
 ```
 Esperado: success=true com usuário/documentroot; erro claro se domínio inválido (RS01).
 
-### 2.2 domain.get_all_info (paginação obrigatória)
+### 2.2 domain_get_all_info (paginação obrigatória)
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_all_info","arguments":{}},"id":11}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_all_info","arguments":{}},"id":11}'
 ```
 Esperado: `data.pagination` com `total/limit/offset/has_more/next_offset`.  
 Repetir com `{"limit":50,"offset":50,"filter":"addon"}` e validar filtro + next_offset.
 
-### 2.3 domain.get_owner
+### 2.3 domain_get_owner
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_owner","arguments":{"domain":"exemplo.com.br"}},"id":12}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_owner","arguments":{"domain":"exemplo.com.br"}},"id":12}'
 ```
 Esperado: owner retornado; erro se domínio inválido.
 
@@ -85,48 +85,48 @@ Esperado: owner retornado; erro se domínio inválido.
 
 ## 3. Domínio – Gestão e Segurança (RF10-RF13, RF21, RS03)
 
-### 3.1 domain.create_alias (idempotente)
+### 3.1 domain_create_alias (idempotente)
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_alias","arguments":{"domain":"aliaslab.com.br","username":"cpuser"}},"id":20}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_create_alias","arguments":{"domain":"aliaslab.com.br","username":"cpuser"}},"id":20}'
 ```
 Repetir o mesmo comando; esperado `idempotent=true` na segunda chamada.
 
-### 3.2 domain.create_subdomain com docroot válido
+### 3.2 domain_create_subdomain com docroot válido
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/api"}},"id":21}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/api"}},"id":21}'
 ```
 Esperado: success; docroot sanitizado.  
 Teste negativo (RS03):
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/../etc"}},"id":22}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/../etc"}},"id":22}'
 ```
 Esperado: erro contendo "cannot contain .." ou diretório restrito.
 
-### 3.3 domain.delete (SafetyGuard – usar domínio descartável)
+### 3.3 domain_delete (SafetyGuard – usar domínio descartável)
 ```bash
 curl -X POST $MCP_HOST/mcp \
   -H "x-api-key: $MCP_API_KEY" \
   -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.delete","arguments":{"domain":"test.aliaslab.com.br","username":"cpuser","type":"subdomain","reason":"Remocao de teste automatizado"}},"id":23}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_delete","arguments":{"domain":"test.aliaslab.com.br","username":"cpuser","type":"subdomain","reason":"Remocao de teste automatizado"}},"id":23}'
 ```
 Esperado: success ou erro claro de autorização; header é aceito mesmo sem `confirmationToken` no body.
 
-### 3.4 domain.resolve
+### 3.4 domain_resolve
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.resolve","arguments":{"domain":"exemplo.com.br"}},"id":24}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_resolve","arguments":{"domain":"exemplo.com.br"}},"id":24}'
 ```
 Esperado: IP resolvido ou erro de DNS.
 
-### 3.5 domain.update_userdomains (lock + SafetyGuard)
+### 3.5 domain_update_userdomains (lock + SafetyGuard)
 ```bash
 curl -X POST $MCP_HOST/mcp \
   -H "x-api-key: $MCP_API_KEY" \
   -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.update_userdomains","arguments":{"reason":"Sincronizacao pos-manutencao"}},"id":25}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_update_userdomains","arguments":{"reason":"Sincronizacao pos-manutencao"}},"id":25}'
 ```
 Esperado: success. Se outro processo estiver rodando, erro 409 com mensagem "Resource busy".
 
@@ -134,29 +134,29 @@ Esperado: success. Se outro processo estiver rodando, erro 409 com mensagem "Res
 
 ## 4. Addon Conversions (RF04-RF09)
 
-- `domain.addon.list`:
+- `domain_addon_list`:
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.list","arguments":{"username":"cpuser"}},"id":30}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_addon_list","arguments":{"username":"cpuser"}},"id":30}'
 ```
-- `domain.addon.details`:
+- `domain_addon_details`:
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.details","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser"}},"id":31}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_addon_details","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser"}},"id":31}'
 ```
-- `domain.addon.conversion_status`:
+- `domain_addon_conversion_status`:
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.conversion_status","arguments":{"conversion_id":"conv_123"}},"id":32}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_addon_conversion_status","arguments":{"conversion_id":"conv_123"}},"id":32}'
 ```
-- `domain.addon.start_conversion` (SafetyGuard):
+- `domain_addon_start_conversion` (SafetyGuard):
 ```bash
 curl -X POST $MCP_HOST/mcp \
   -H "x-api-key: $MCP_API_KEY" \
   -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.start_conversion","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser","new_username":"novocp","reason":"Teste de conversao automatizada"}},"id":33}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_addon_start_conversion","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser","new_username":"novocp","reason":"Teste de conversao automatizada"}},"id":33}'
 ```
-- `domain.addon.conversion_details` / `domain.addon.list_conversions`: verificar que retornam status, timestamps e steps.
+- `domain.addon.conversion_details` / `domain_addon_list_conversions`: verificar que retornam status, timestamps e steps.
 
 Esperado: erros claros se conversion_id inválido; SafetyGuard exigido em start_conversion.
 
@@ -164,16 +164,16 @@ Esperado: erros claros se conversion_id inválido; SafetyGuard exigido em start_
 
 ## 5. DNS Autoridade e MX (RF14-RF16)
 
-### 5.1 domain.check_authority
+### 5.1 domain_check_authority
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.check_authority","arguments":{"domain":"exemplo.com.br"}},"id":40}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_check_authority","arguments":{"domain":"exemplo.com.br"}},"id":40}'
 ```
 
-### 5.2 dns.list_mx / dns.add_mx (idempotência)
+### 5.2 dns_list_mx / dns_add_mx (idempotência)
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.add_mx","arguments":{"domain":"exemplo.com.br","exchange":"mail.exemplo.com.br","priority":10}},"id":41}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_add_mx","arguments":{"domain":"exemplo.com.br","exchange":"mail.exemplo.com.br","priority":10}},"id":41}'
 ```
 Repetir o mesmo comando: esperado `idempotent=true` na segunda chamada.
 
@@ -181,18 +181,18 @@ Repetir o mesmo comando: esperado `idempotent=true` na segunda chamada.
 
 ## 6. DNSSEC / DS / ALIAS (RF17-RF18)
 
-### 6.1 domain.get_ds_records
+### 6.1 domain_get_ds_records
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_ds_records","arguments":{"domains":["exemplo.com.br"]}},"id":50}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_ds_records","arguments":{"domains":["exemplo.com.br"]}},"id":50}'
 ```
 Esperado: DS records quando DNSSEC ativo; caso contrário erro claro:  
 `"DNSSEC não configurado ou endpoint WHM indisponível..."` (sem timeout >30s).
 
-### 6.2 dns.check_alias_available
+### 6.2 dns_check_alias_available
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.check_alias_available","arguments":{"zone":"exemplo.com.br","name":"cdn"}},"id":51}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_check_alias_available","arguments":{"zone":"exemplo.com.br","name":"cdn"}},"id":51}'
 ```
 Esperado: `available=true/false` ou erro claro `"Checagem de ALIAS não suportada..."` se endpoint faltar. Chamada não deve pendurar.
 
@@ -200,34 +200,34 @@ Esperado: `available=true/false` ou erro claro `"Checagem de ALIAS não suportad
 
 ## 7. NSEC3 Assíncrono (RF19-RF20-RF22)
 
-### 7.1 domain.enable_nsec3 (SafetyGuard)
+### 7.1 domain_enable_nsec3 (SafetyGuard)
 ```bash
 curl -X POST $MCP_HOST/mcp \
   -H "x-api-key: $MCP_API_KEY" \
   -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.enable_nsec3","arguments":{"domains":["exemplo.com.br"],"reason":"Habilitar NSEC3 para teste"}},"id":60}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_enable_nsec3","arguments":{"domains":["exemplo.com.br"],"reason":"Habilitar NSEC3 para teste"}},"id":60}'
 ```
 Esperado: `operation_id`, `status=pending`, `estimated_timeout` <= 600s, `polling_interval=5000`.
 
-### 7.2 domain.get_nsec3_status
+### 7.2 domain_get_nsec3_status
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_nsec3_status","arguments":{"operation_id":"<OP_ID>"}},"id":61}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_nsec3_status","arguments":{"operation_id":"<OP_ID>"}},"id":61}'
 ```
 Esperado: status `pending|in_progress|completed|failed`, `progress_percent`, timestamps; erro claro se operation_id inexistente.
 
-### 7.3 domain.disable_nsec3 (similar ao enable)
-Repetir chamada com `domain.disable_nsec3` e mesmo fluxo de polling.
+### 7.3 domain_disable_nsec3 (similar ao enable)
+Repetir chamada com `domain_disable_nsec3` e mesmo fluxo de polling.
 
 ---
 
 ## 8. Segurança e Validações (RS01-RS04)
 
-- **SafetyGuard via header**: repetir domain.delete enviando header e body diferentes; body tem precedência.
+- **SafetyGuard via header**: repetir domain_delete enviando header e body diferentes; body tem precedência.
 - **Domain Validation (RS01)**:
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_user_data","arguments":{"domain":"invalido.com; rm -rf /"}},"id":70}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain_get_user_data","arguments":{"domain":"invalido.com; rm -rf /"}},"id":70}'
 ```
 Esperado: erro "Domain contains shell metacharacters" / similar.
 
@@ -247,7 +247,7 @@ curl -X GET $MCP_HOST/metrics
 ```
 Esperado: métricas `whm_domain_operations_total`, `whm_domain_operation_duration_seconds`, `whm_safety_guard_validations_total`, `whm_rate_limit_hits_total`.
 
-- **Timeouts**: domain.get_ds_records e dns.check_alias_available devem responder em <= `WHM_TIMEOUT` (default 30s) com mensagem clara; NSEC3 segue cálculo dinâmico `60s + 30s * dom` (máx 600s).
+- **Timeouts**: domain_get_ds_records e dns_check_alias_available devem responder em <= `WHM_TIMEOUT` (default 30s) com mensagem clara; NSEC3 segue cálculo dinâmico `60s + 30s * dom` (máx 600s).
 
 ---
 
@@ -256,7 +256,7 @@ Esperado: métricas `whm_domain_operations_total`, `whm_domain_operation_duratio
 | Item | Status |
 |------|--------|
 | Health / Auth / tools.list (45) | [ ] |
-| domain.get_user_data / get_all_info / get_owner | [ ] |
+| domain_get_user_data / get_all_info / get_owner | [ ] |
 | create_alias / create_subdomain / delete / resolve | [ ] |
 | addon list/details/status/start/details/list | [ ] |
 | check_authority / list_mx / add_mx idempotente | [ ] |
@@ -306,52 +306,52 @@ curl -X GET $MCP_HOST/health
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
-Verificar dns.*, whm.*, system.*, file.*, log.*
+Verificar dns_*, whm_*, system_*, file_*, log_*
 
 ### AC03: Listar Contas WHM
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.list_accounts","arguments":{}},"id":2}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_list_accounts","arguments":{}},"id":2}'
 ```
 
-### AC04: SSH Seguro (não existe ssh.execute)
-- Chamada para ssh.execute → erro -32601
-- `system.restart_service` com serviço permitido → success
+### AC04: SSH Seguro (não existe ssh_execute)
+- Chamada para ssh_execute → erro -32601
+- `system_restart_service` com serviço permitido → success
 - Serviço não permitido → -32602 com allowed_services
-- `log.read_last_lines` em arquivo permitido → success
+- `log_read_last_lines` em arquivo permitido → success
 - Arquivo não autorizado → -32000 Unauthorized log file access
 
 ### AC05: Arquivos cPanel
-- `file.list`, `file.read`, `file.write` (com SafetyGuard), `file.delete` (SafetyGuard)
+- `file_list`, `file_read`, `file_write` (com SafetyGuard), `file_delete` (SafetyGuard)
 
 ### AC06: Listar Zonas DNS
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.list_zones","arguments":{}},"id":9}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_list_zones","arguments":{}},"id":9}'
 ```
 
 ### AC07: Obter Zona DNS Completa
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.get_zone","arguments":{"zone":"cliente1.com.br"}},"id":10}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_get_zone","arguments":{"zone":"cliente1.com.br"}},"id":10}'
 ```
 
 ### AC08: Adicionar Registro DNS (A/CNAME)
-- `dns.add_record` com A ou CNAME
-- `dns.edit_record` com optimistic locking (expected_content)
-- `dns.reset_zone`
+- `dns_add_record` com A ou CNAME
+- `dns_edit_record` com optimistic locking (expected_content)
+- `dns_reset_zone`
 
 ### AC09: Deletar Registro DNS
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.delete_record","arguments":{"zone":"cliente1.com.br","line":15,"confirmationToken":"'$MCP_SAFETY_TOKEN'","reason":"Remocao do registro legado solicitada pelo cliente"}},"id":15}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_delete_record","arguments":{"zone":"cliente1.com.br","line":15,"confirmationToken":"'$MCP_SAFETY_TOKEN'","reason":"Remocao do registro legado solicitada pelo cliente"}},"id":15}'
 ```
 
 ### AC10: Segurança de Credenciais
 - Verificar logs não contêm tokens; buscar `[REDACTED]` nos logs.
 
 ### AC11: Zona DNS Inexistente
-- `dns.get_zone` com zona inválida → erro "Zone Not Found" + sugestão
+- `dns_get_zone` com zona inválida → erro "Zone Not Found" + sugestão
 
 ### AC12: PM2 Estabilidade
 - `pm2 list | grep mcp-whm-cpanel`
@@ -369,4 +369,4 @@ curl -X GET $MCP_HOST/metrics
 - WHM timeout 30s, SSH 60s, DNS 45s → erro "Operation timed out after <x>s".
 
 ### AC18: WHM 200 com metadata.result=0
-- `dns.add_record` com domínio inválido deve retornar erro mapeado mostrando `whm_metadata_result: 0`.
+- `dns_add_record` com domínio inválido deve retornar erro mapeado mostrando `whm_metadata_result: 0`.

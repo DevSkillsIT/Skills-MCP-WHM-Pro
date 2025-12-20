@@ -4,7 +4,7 @@
   "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, and monitoring capabilities",
   "tools": [
     {
-      "name": "whm.list_accounts",
+      "name": "whm_list_accounts",
       "description": "List all cPanel accounts on the WHM server with detailed information including disk usage, bandwidth, and status",
       "inputSchema": {
         "type": "object",
@@ -15,7 +15,7 @@
       "security": "read-only"
     },
     {
-      "name": "whm.create_account",
+      "name": "whm_create_account",
       "description": "Create a new cPanel account with specified domain, username, password, and hosting package",
       "inputSchema": {
         "type": "object",
@@ -50,7 +50,7 @@
       "security": "write"
     },
     {
-      "name": "whm.suspend_account",
+      "name": "whm_suspend_account",
       "description": "Suspend a cPanel account and prevent access. Useful for policy violations or non-payment",
       "inputSchema": {
         "type": "object",
@@ -70,7 +70,7 @@
       "security": "write"
     },
     {
-      "name": "whm.unsuspend_account",
+      "name": "whm_unsuspend_account",
       "description": "Unsuspend a previously suspended cPanel account and restore access",
       "inputSchema": {
         "type": "object",
@@ -86,7 +86,7 @@
       "security": "write"
     },
     {
-      "name": "whm.terminate_account",
+      "name": "whm_terminate_account",
       "description": "Permanently delete a cPanel account and all associated data. This action is IRREVERSIBLE. Requires confirmationToken.",
       "inputSchema": {
         "type": "object",
@@ -110,7 +110,7 @@
       "security": "destructive"
     },
     {
-      "name": "whm.get_account_summary",
+      "name": "whm_get_account_summary",
       "description": "Get detailed information about a specific cPanel account including usage statistics and configuration",
       "inputSchema": {
         "type": "object",
@@ -126,7 +126,7 @@
       "security": "read-only"
     },
     {
-      "name": "whm.server_status",
+      "name": "whm_server_status",
       "description": "Get comprehensive server status including uptime, load average, memory usage, and service health",
       "inputSchema": {
         "type": "object",
@@ -137,7 +137,7 @@
       "security": "read-only"
     },
     {
-      "name": "whm.service_status",
+      "name": "whm_service_status",
       "description": "Check the status of a specific service (httpd, mysql, named, etc.)",
       "inputSchema": {
         "type": "object",
@@ -154,7 +154,7 @@
       "security": "read-only"
     },
     {
-      "name": "whm.restart_service",
+      "name": "whm_restart_service",
       "description": "Restart a system service. Requires confirmationToken for safety.",
       "inputSchema": {
         "type": "object",
@@ -179,7 +179,7 @@
       "security": "write"
     },
     {
-      "name": "whm.list_domains",
+      "name": "whm_list_domains",
       "description": "List all domains across all cPanel accounts on the server",
       "inputSchema": {
         "type": "object",
@@ -190,7 +190,7 @@
       "security": "read-only"
     },
     {
-      "name": "dns.list_zones",
+      "name": "dns_list_zones",
       "description": "List all DNS zones managed by the WHM server with zone status and record counts",
       "inputSchema": {
         "type": "object",
@@ -201,7 +201,7 @@
       "security": "read-only"
     },
     {
-      "name": "dns.get_zone",
+      "name": "dns_get_zone",
       "description": "Get complete DNS zone records for a specific domain including A, AAAA, CNAME, MX, TXT, NS records",
       "inputSchema": {
         "type": "object",
@@ -217,7 +217,7 @@
       "security": "read-only"
     },
     {
-      "name": "dns.add_record",
+      "name": "dns_add_record",
       "description": "Add a new DNS record to a zone. Supports A, AAAA, CNAME, MX, TXT, NS, PTR record types",
       "inputSchema": {
         "type": "object",
@@ -266,7 +266,7 @@
       "security": "write"
     },
     {
-      "name": "dns.edit_record",
+      "name": "dns_edit_record",
       "description": "Edit an existing DNS record with optimistic locking to prevent race conditions. Requires expected_content for safety.",
       "inputSchema": {
         "type": "object",
@@ -277,7 +277,7 @@
           },
           "line": {
             "type": "number",
-            "description": "Line number of record to edit (from dns.get_zone)"
+            "description": "Line number of record to edit (from dns_get_zone)"
           },
           "expected_content": {
             "type": "string",
@@ -302,7 +302,7 @@
       "security": "write"
     },
     {
-      "name": "dns.delete_record",
+      "name": "dns_delete_record",
       "description": "Delete a DNS record from a zone. Requires confirmationToken.",
       "inputSchema": {
         "type": "object",
@@ -330,7 +330,7 @@
       "security": "destructive"
     },
     {
-      "name": "dns.reset_zone",
+      "name": "dns_reset_zone",
       "description": "Reset DNS zone to default records. Destructive operation requiring confirmationToken.",
       "inputSchema": {
         "type": "object",
@@ -354,7 +354,7 @@
       "security": "destructive"
     },
     {
-      "name": "system.restart_service",
+      "name": "system_restart_service",
       "description": "Restart a system service from the allowlist. Safer alternative to arbitrary SSH commands.",
       "inputSchema": {
         "type": "object",
@@ -370,7 +370,7 @@
       "security": "write"
     },
     {
-      "name": "system.get_load",
+      "name": "system_get_load",
       "description": "Get server load averages (1min, 5min, 15min), memory usage, disk usage, and uptime",
       "inputSchema": {
         "type": "object",
@@ -381,7 +381,7 @@
       "security": "read-only"
     },
     {
-      "name": "log.read_last_lines",
+      "name": "log_read_last_lines",
       "description": "Read last N lines from a whitelisted log file. Access restricted to /var/log/* and /usr/local/cpanel/logs/*",
       "inputSchema": {
         "type": "object",
@@ -404,7 +404,7 @@
       "security": "read-only"
     },
     {
-      "name": "file.list",
+      "name": "file_list",
       "description": "List files and directories in a cPanel account's directory. Path validation ensures access only within /home/{username}",
       "inputSchema": {
         "type": "object",
@@ -424,7 +424,7 @@
       "security": "read-only"
     },
     {
-      "name": "file.read",
+      "name": "file_read",
       "description": "Read content of a file within a cPanel account's directory. Path validation enforced.",
       "inputSchema": {
         "type": "object",
@@ -444,7 +444,7 @@
       "security": "read-only"
     },
     {
-      "name": "file.write",
+      "name": "file_write",
       "description": "Write content to a file in a cPanel account. Creates automatic backup before overwrite. Requires confirmationToken.",
       "inputSchema": {
         "type": "object",
@@ -476,7 +476,7 @@
       "security": "write"
     },
     {
-      "name": "file.delete",
+      "name": "file_delete",
       "description": "Delete a file from a cPanel account. Requires confirmationToken for safety.",
       "inputSchema": {
         "type": "object",

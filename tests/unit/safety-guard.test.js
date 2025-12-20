@@ -25,7 +25,7 @@ describe('SafetyGuard', () => {
 
   it('permite operacao quando token e motivo corretos', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('file.delete', {
+      SafetyGuard.requireConfirmation('file_delete', {
         confirmationToken: 'unit-test-token',
         reason: 'Remocao solicitada pelo cliente'
       })
@@ -36,7 +36,7 @@ describe('SafetyGuard', () => {
     delete process.env.MCP_SAFETY_TOKEN;
 
     expect(() =>
-      SafetyGuard.requireConfirmation('file.delete', {
+      SafetyGuard.requireConfirmation('file_delete', {
         confirmationToken: 'qualquer',
         reason: 'motivo valido'
       })
@@ -45,7 +45,7 @@ describe('SafetyGuard', () => {
 
   it('falha quando token informado e invalido', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('file.delete', {
+      SafetyGuard.requireConfirmation('file_delete', {
         confirmationToken: 'token-errado',
         reason: 'motivo qualquer'
       })
@@ -54,7 +54,7 @@ describe('SafetyGuard', () => {
 
   it('falha quando motivo e muito curto', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('dns.reset_zone', {
+      SafetyGuard.requireConfirmation('dns_reset_zone', {
         confirmationToken: 'unit-test-token',
         reason: 'curto'
       })
@@ -66,7 +66,7 @@ describe('SafetyGuard', () => {
     delete process.env.MCP_SAFETY_TOKEN;
 
     expect(() =>
-      SafetyGuard.requireConfirmation('file.delete', {
+      SafetyGuard.requireConfirmation('file_delete', {
         confirmationToken: 'qualquer',
         reason: 'nao deveria validar'
       })

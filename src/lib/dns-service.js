@@ -262,7 +262,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.listZones(),
         getTimeoutByType('DNS'),
-        'dns.list_zones'
+        'dns_list_zones'
       );
 
       const zones = (result.data?.zone || []).map(z => ({
@@ -334,7 +334,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns.get_zone'
+        'dns_get_zone'
       );
 
       // Verificar se zona existe
@@ -490,7 +490,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.addZoneRecord(zone, type, name, data),
         getTimeoutByType('DNS'),
-        'dns.add_record'
+        'dns_add_record'
       );
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
@@ -554,7 +554,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.editZoneRecord(zone, line, data),
         getTimeoutByType('DNS'),
-        'dns.edit_record'
+        'dns_edit_record'
       );
 
       // Validar zona apos modificacao
@@ -636,7 +636,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.removeZoneRecord(zone, line),
         getTimeoutByType('DNS'),
-        'dns.delete_record'
+        'dns_delete_record'
       );
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
@@ -687,7 +687,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.resetZone(zone),
         getTimeoutByType('DNS'),
-        'dns.reset_zone'
+        'dns_reset_zone'
       );
 
       // Obter zona apos reset
@@ -755,7 +755,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns.check_nested_domains'
+        'dns_check_nested_domains'
       );
 
       // Verificar se zona existe
@@ -855,7 +855,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns.search_record'
+        'dns_search_record'
       );
 
       // Verificar se zona existe

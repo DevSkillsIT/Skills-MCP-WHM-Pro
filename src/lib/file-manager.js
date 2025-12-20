@@ -168,7 +168,7 @@ class FileManager {
       const response = await withTimeout(
         () => this.api.get(`/json-api/cpanel?${params}`),
         getTimeoutByType('FILE'),
-        'file.list'
+        'file_list'
       );
 
       const files = (response.data?.cpanelresult?.data || []).map(file => ({
@@ -218,7 +218,7 @@ class FileManager {
       const response = await withTimeout(
         () => this.api.get(`/json-api/cpanel?${params}`),
         getTimeoutByType('FILE'),
-        'file.read'
+        'file_read'
       );
 
       if (response.data?.cpanelresult?.data?.[0]) {
@@ -302,7 +302,7 @@ class FileManager {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }),
         getTimeoutByType('FILE'),
-        'file.write'
+        'file_write'
       );
 
       const message = backupCreated ? 'File overwritten successfully' : 'File written successfully';
@@ -369,7 +369,7 @@ class FileManager {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }),
         getTimeoutByType('FILE'),
-        'file.delete'
+        'file_delete'
       );
 
       return {
