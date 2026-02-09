@@ -26,8 +26,8 @@ Implementação completa de **22 tools de gerenciamento de domínios** para o WH
 ### 2.1 `/opt/mcp-servers/whm-cpanel/src/mcp-handler.js`
 - **Linhas totais:** ~1.170
 - **Mudanças:**
-  - Renomeação: `domain.list_all` → `domain.get_all_info`
-  - Renomeação: `domain.create_parked` → `domain.create_alias`
+  - Renomeação: `domain.list_all` → `whm_cpanel_list_all_domains`
+  - Renomeação: `domain.create_parked` → `whm_cpanel_create_domain_alias`
   - +17 tool definitions no `buildToolDefinitions()`
   - +14 novos cases (11 em `executeDomainTool()`, 3 em `executeDnsTool()`)
   - Import adicional: `withTimeout`
@@ -46,28 +46,28 @@ Implementação completa de **22 tools de gerenciamento de domínios** para o WH
 
 | RF | Tool MCP | Tipo | SafetyGuard | Status |
 |----|----------|------|------------|--------|
-| RF01 | `domain.get_user_data` | INFO | - | ✓ |
-| RF02 | `domain.get_all_info` | INFO | - | ✓ RENOMEADO |
-| RF03 | `domain.get_owner` | INFO | - | ✓ |
-| RF04 | `domain.addon.list` | INFO | - | ✓ NOVO |
-| RF05 | `domain.addon.details` | INFO | - | ✓ NOVO |
-| RF06 | `domain.addon.conversion_status` | INFO | - | ✓ NOVO |
-| RF07 | `domain.addon.start_conversion` | ACTION | ✓ | ✓ NOVO |
-| RF08 | `domain.addon.conversion_details` | INFO | - | ✓ NOVO |
-| RF09 | `domain.addon.list_conversions` | INFO | - | ✓ NOVO |
-| RF10 | `domain.create_alias` | ACTION | - | ✓ RENOMEADO |
-| RF11 | `domain.create_subdomain` | ACTION | - | ✓ |
-| RF12 | `domain.delete` | ACTION | ✓ | ✓ |
-| RF13 | `domain.resolve` | INFO | - | ✓ |
-| RF14 | `domain.check_authority` | INFO | - | ✓ NOVO |
-| RF15 | `dns.list_mx` | INFO | - | ✓ NOVO |
-| RF16 | `dns.add_mx` | ACTION | - | ✓ NOVO |
-| RF17 | `domain.get_ds_records` | INFO | - | ✓ NOVO |
-| RF18 | `dns.check_alias_available` | INFO | - | ✓ NOVO |
-| RF19 | `domain.enable_nsec3` | ACTION | ✓ | ✓ NOVO |
-| RF20 | `domain.disable_nsec3` | ACTION | ✓ | ✓ NOVO |
-| RF21 | `domain.update_userdomains` | ACTION | ✓ | ✓ NOVO |
-| RF22 | `domain.get_nsec3_status` | INFO | - | ✓ NOVO |
+| RF01 | `whm_cpanel_get_domain_data` | INFO | - | ✓ |
+| RF02 | `whm_cpanel_list_all_domains` | INFO | - | ✓ RENOMEADO |
+| RF03 | `whm_cpanel_get_domain_owner` | INFO | - | ✓ |
+| RF04 | `whm_cpanel_list_addon_domains` | INFO | - | ✓ NOVO |
+| RF05 | `whm_cpanel_get_addon_domain_details` | INFO | - | ✓ NOVO |
+| RF06 | `whm_cpanel_get_addon_conversion_status` | INFO | - | ✓ NOVO |
+| RF07 | `whm_cpanel_create_addon_conversion` | ACTION | ✓ | ✓ NOVO |
+| RF08 | `whm_cpanel_get_addon_conversion_details` | INFO | - | ✓ NOVO |
+| RF09 | `whm_cpanel_list_addon_conversions` | INFO | - | ✓ NOVO |
+| RF10 | `whm_cpanel_create_domain_alias` | ACTION | - | ✓ RENOMEADO |
+| RF11 | `whm_cpanel_create_subdomain` | ACTION | - | ✓ |
+| RF12 | `whm_cpanel_delete_domain` | ACTION | ✓ | ✓ |
+| RF13 | `whm_cpanel_resolve_domain_ip` | INFO | - | ✓ |
+| RF14 | `whm_cpanel_check_domain_authority` | INFO | - | ✓ NOVO |
+| RF15 | `whm_cpanel_list_dns_mx_records` | INFO | - | ✓ NOVO |
+| RF16 | `whm_cpanel_create_dns_mx_record` | ACTION | - | ✓ NOVO |
+| RF17 | `whm_cpanel_get_dnssec_ds_records` | INFO | - | ✓ NOVO |
+| RF18 | `whm_cpanel_check_dns_alias_available` | INFO | - | ✓ NOVO |
+| RF19 | `whm_cpanel_enable_dnssec_nsec3` | ACTION | ✓ | ✓ NOVO |
+| RF20 | `whm_cpanel_disable_dnssec_nsec3` | ACTION | ✓ | ✓ NOVO |
+| RF21 | `whm_cpanel_update_userdomains_cache` | ACTION | ✓ | ✓ NOVO |
+| RF22 | `whm_cpanel_get_nsec3_operation_status` | INFO | - | ✓ NOVO |
 
 ---
 
@@ -138,11 +138,11 @@ async getNsec3Status(operationId)
 
 ### Operações Protegidas (5)
 
-1. `domain.addon.start_conversion`
-2. `domain.delete` (pré-existente)
-3. `domain.enable_nsec3`
-4. `domain.disable_nsec3`
-5. `domain.update_userdomains`
+1. `whm_cpanel_create_addon_conversion`
+2. `whm_cpanel_delete_domain` (pré-existente)
+3. `whm_cpanel_enable_dnssec_nsec3`
+4. `whm_cpanel_disable_dnssec_nsec3`
+5. `whm_cpanel_update_userdomains_cache`
 
 ### Implementação
 
@@ -193,7 +193,7 @@ return await withOperationTimeout(fn, 'operation', enableTimeout);
 
 ### Operação Protegida
 
-`domain.update_userdomains` - Lock exclusivo para proteger `/etc/userdomains`
+`whm_cpanel_update_userdomains_cache` - Lock exclusivo para proteger `/etc/userdomains`
 
 ### Implementação
 
@@ -382,7 +382,7 @@ curl -X POST https://localhost:8443/mcp \
     "jsonrpc": "2.0",
     "method": "tools/call",
     "params": {
-      "name": "domain.addon.list",
+      "name": "whm_cpanel_list_addon_domains",
       "arguments": {"username": "cpaneluser"}
     },
     "id": 1
@@ -398,7 +398,7 @@ curl -X POST https://localhost:8443/mcp \
     "jsonrpc": "2.0",
     "method": "tools/call",
     "params": {
-      "name": "domain.enable_nsec3",
+      "name": "whm_cpanel_enable_dnssec_nsec3",
       "arguments": {
         "domains": ["example.com", "test.org"],
         "confirmationToken": "'"$MCP_SAFETY_TOKEN"'",
@@ -418,7 +418,7 @@ curl -X POST https://localhost:8443/mcp \
     "jsonrpc": "2.0",
     "method": "tools/call",
     "params": {
-      "name": "domain.get_nsec3_status",
+      "name": "whm_cpanel_get_nsec3_operation_status",
       "arguments": {"operation_id": "nsec3_1733612345678"}
     },
     "id": 1
@@ -477,13 +477,13 @@ curl -X POST https://localhost:8443/mcp \
 
 4. **Testar tool específico:**
    ```bash
-   # Test domain.addon.list
+   # Test whm_cpanel_list_addon_domains
    curl -X POST http://mcp.example.com:8443/mcp \
      -H 'Content-Type: application/json' \
      -d '{
        "jsonrpc":"2.0",
        "method":"tools/call",
-       "params":{"name":"domain.addon.list","arguments":{"username":"testuser"}},
+       "params":{"name":"whm_cpanel_list_addon_domains","arguments":{"username":"testuser"}},
        "id":1
      }'
    ```
@@ -539,7 +539,7 @@ curl -X POST https://localhost:8443/mcp \
 ### Compatibilidade Backward
 
 - Método `createParkedDomain()` mantém mesmo nome em `whm-service.js`
-- Apenas nome da tool mudou: `domain.create_parked` → `domain.create_alias`
+- Apenas nome da tool mudou: `domain.create_parked` → `whm_cpanel_create_domain_alias`
 - Todos os endpoints existentes continuam funcionando
 
 ### Módulos Reutilizados

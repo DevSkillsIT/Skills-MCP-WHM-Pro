@@ -107,7 +107,7 @@ describe('AC02: Lista de Tools MCP', () => {
       .send({ jsonrpc: '2.0', method: 'tools/list', id: 1 });
 
     const tools = response.body.result.tools;
-    const dnsTools = tools.filter(t => t.name.startsWith('dns_'));
+    const dnsTools = tools.filter(t => t.name.includes('_dns_'));
     expect(dnsTools.length).toBeGreaterThan(0);
   });
 });
@@ -135,7 +135,7 @@ describe('AC04: Gerenciamento SSH Seguro', () => {
       .send({
         jsonrpc: '2.0',
         method: 'tools/call',
-        params: { name: 'system_restart_service', arguments: { service: 'malicious-service' } },
+        params: { name: 'whm_cpanel_restart_system_service', arguments: { service: 'malicious-service' } },
         id: 1
       });
 
@@ -151,7 +151,7 @@ describe('AC04: Gerenciamento SSH Seguro', () => {
       .send({
         jsonrpc: '2.0',
         method: 'tools/call',
-        params: { name: 'log_read_last_lines', arguments: { logfile: '/etc/shadow', lines: 10 } },
+        params: { name: 'whm_cpanel_read_system_log_lines', arguments: { log_file: '/etc/shadow', lines: 10 } },
         id: 1
       });
 

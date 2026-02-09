@@ -87,7 +87,7 @@ const ERROR_MESSAGES = {
   },
 
   OPTIMIZATION: {
-    RESPONSE_TOO_LARGE: 'Resposta muito grande: {tokens} tokens estimados. Use filtros ou dns_search_record',
+    RESPONSE_TOO_LARGE: 'Resposta muito grande: {tokens} tokens estimados. Use filtros ou whm_cpanel_search_dns_record',
     RECORDS_LIMITED: 'Registros limitados a {limit}. Total disponível: {total}',
     PAGINATION_REQUIRED: 'Paginação obrigatória para {total} registros'
   },

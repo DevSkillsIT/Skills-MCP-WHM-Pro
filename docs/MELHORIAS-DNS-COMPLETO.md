@@ -12,7 +12,7 @@
 Este documento detalha as melhorias críticas implementadas no MCP WHM/cPanel para resolver o problema de respostas DNS com mais de 25.000 tokens, causado por domínios aninhados em zonas WHM.
 
 **Problema Original:**
-- Tool `dns_get_zone` retornou 25.100+ tokens ao consultar `skillsit.com.br`
+- Tool `whm_cpanel_get_dns_zone_records` retornou 25.100+ tokens ao consultar `skillsit.com.br`
 - Causado por centenas de subdomínios aninhados (padrão comum no WHM/cPanel)
 - Timeout em IAs com janelas pequenas de contexto
 - Impossibilidade de trabalhar com zonas grandes
@@ -26,7 +26,7 @@ No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um sub
 - **Sistema de cache** de 120 segundos (reduz 95% de chamadas repetidas)
 - **Detecção automática** de domínios aninhados com warnings
 - **Busca otimizada** que retorna apenas registros relevantes (economiza 90%+ tokens)
-- **Filtros avançados** em `dns_get_zone` (tipo, nome, quantidade)
+- **Filtros avançados** em `whm_cpanel_get_dns_zone_records` (tipo, nome, quantidade)
 - **2 novas tools MCP** especializadas em diagnóstico e busca
 
 **Impacto Esperado:**
@@ -41,7 +41,7 @@ No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um sub
 
 ### Contexto Técnico
 
-**Situação:** Tool `dns_get_zone` retornou **25.100+ tokens** ao consultar zona `skillsit.com.br`, excedendo capacidade de muitas IAs.
+**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou **25.100+ tokens** ao consultar zona `skillsit.com.br`, excedendo capacidade de muitas IAs.
 
 **Por que aconteceu:**
 
@@ -277,13 +277,13 @@ detectNestedDomains(zoneRecords, baseDomain)
     level2: 38,      // app.tools.skillsit.com.br
     level3plus: 5    // deep.nested.app.tools.skillsit.com.br
   },
-  warning: "⚠️ Zona com muitos subdomínios (287 registros de nível 1) - use filtros ou dns_search_record!",
+  warning: "⚠️ Zona com muitos subdomínios (287 registros de nível 1) - use filtros ou whm_cpanel_search_dns_record!",
   examples: {
     level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
     level2: ["app.tools.skillsit.com.br"],
     level3plus: []
   },
-  recommendation: "Use dns_search_record para buscar registros específicos ou dns_get_zone com filtros"
+  recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos ou whm_cpanel_get_dns_zone_records com filtros"
 }
 ```
 
@@ -304,10 +304,10 @@ const analysis = detectNestedDomains(records, 'skillsit.com.br');
 
 if (analysis.hasNested) {
   console.log(analysis.warning);
-  // "⚠️ Zona com muitos subdomínios (287 registros de nível 1) - use filtros ou dns_search_record!"
+  // "⚠️ Zona com muitos subdomínios (287 registros de nível 1) - use filtros ou whm_cpanel_search_dns_record!"
 
   console.log(analysis.recommendation);
-  // "Use dns_search_record para buscar registros específicos..."
+  // "Use whm_cpanel_search_dns_record para buscar registros específicos..."
 }
 ```
 
@@ -550,8 +550,8 @@ isValidRecordType(type)       // Valida tipo de registro DNS
       {
         severity: "high",
         message: "Zona possui 287 subdomínios de nível 1",
-        action: "Use dns_search_record para buscar registros específicos",
-        example: "dns_search_record({ zone: 'skillsit.com.br', name: 'prometheus', type: ['A'] })"
+        action: "Use whm_cpanel_search_dns_record para buscar registros específicos",
+        example: "whm_cpanel_search_dns_record({ zone: 'skillsit.com.br', name: 'prometheus', type: ['A'] })"
       }
     ]
   }
@@ -621,25 +621,25 @@ curl -X POST http://mcp.example.com:3200/mcp \
       level2: 38,    // app.tools.skillsit.com.br
       level3plus: 5  // deep.nested.app.tools.skillsit.com.br
     },
-    warning: "⚠️ Zona com muitos subdomínios - use filtros ou dns_search_record!",
+    warning: "⚠️ Zona com muitos subdomínios - use filtros ou whm_cpanel_search_dns_record!",
     examples: {
       level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
       level2: ["app.tools.skillsit.com.br"],
       level3plus: []
     },
-    recommendation: "Use dns_search_record para buscar registros específicos ou dns_get_zone com filtros",
+    recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos ou whm_cpanel_get_dns_zone_records com filtros",
     suggestions: [
       {
         severity: "high",
         message: "Zona possui 287 subdomínios de nível 1",
-        action: "Use dns_search_record para buscar registros específicos em vez de obter toda a zona",
-        example: "dns_search_record({ zone: \"skillsit.com.br\", name: \"prometheus\", type: [\"A\", \"AAAA\"] })"
+        action: "Use whm_cpanel_search_dns_record para buscar registros específicos em vez de obter toda a zona",
+        example: "whm_cpanel_search_dns_record({ zone: \"skillsit.com.br\", name: \"prometheus\", type: [\"A\", \"AAAA\"] })"
       },
       {
         severity: "medium",
         message: "Zona contém 342 registros no total",
-        action: "Use filtros em dns_get_zone para limitar quantidade de registros retornados",
-        example: "dns_get_zone({ zone: \"skillsit.com.br\", record_type: \"A\", max_records: 100 })"
+        action: "Use filtros em whm_cpanel_get_dns_zone_records para limitar quantidade de registros retornados",
+        example: "whm_cpanel_get_dns_zone_records({ zone: \"skillsit.com.br\", record_type: \"A\", max_records: 100 })"
       }
     ]
   }
@@ -1193,7 +1193,7 @@ const analysis = await dns.check_nested_domains({ zone: "skillsit.com.br" });
 
 if (analysis.hasNested) {
   console.log(analysis.warning);
-  // "⚠️ Zona com muitos subdomínios - use filtros ou dns_search_record!"
+  // "⚠️ Zona com muitos subdomínios - use filtros ou whm_cpanel_search_dns_record!"
 
   // 2. Decidir abordagem
   if (analysis.byLevel.level1 > 100) {

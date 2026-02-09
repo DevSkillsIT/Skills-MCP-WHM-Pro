@@ -25,36 +25,62 @@ const TIMEOUT_CONFIG = {
 
 // Mapeamento de operacoes para tipos de timeout
 const OPERATION_TIMEOUT_MAP = {
-  // WHM API
-  'whm_list_accounts': 'WHM_API',
-  'whm_create_account': 'WHM_API',
-  'whm_suspend_account': 'WHM_API',
-  'whm_unsuspend_account': 'WHM_API',
-  'whm_terminate_account': 'WHM_API',
-  'whm_get_account_summary': 'WHM_API',
-  'whm_server_status': 'WHM_API',
-  'whm_service_status': 'WHM_API',
-  'whm_restart_service': 'WHM_API',
-  'whm_list_domains': 'WHM_API',
+  // WHM API - Account Management
+  'whm_cpanel_list_accounts': 'WHM_API',
+  'whm_cpanel_create_account': 'WHM_API',
+  'whm_cpanel_suspend_account': 'WHM_API',
+  'whm_cpanel_unsuspend_account': 'WHM_API',
+  'whm_cpanel_delete_account': 'WHM_API',
+  'whm_cpanel_get_account_summary': 'WHM_API',
+  'whm_cpanel_get_server_status': 'WHM_API',
+  'whm_cpanel_get_services_status': 'WHM_API',
+  'whm_cpanel_restart_service': 'WHM_API',
+  'whm_cpanel_list_all_domains': 'WHM_API',
+
+  // WHM API - Domain Management
+  'whm_cpanel_list_account_domains': 'WHM_API',
+  'whm_cpanel_get_domain_data': 'WHM_API',
+  'whm_cpanel_get_domain_owner': 'WHM_API',
+  'whm_cpanel_create_domain_alias': 'WHM_API',
+  'whm_cpanel_create_subdomain': 'WHM_API',
+  'whm_cpanel_delete_domain': 'WHM_API',
+  'whm_cpanel_resolve_domain_ip': 'WHM_API',
+  'whm_cpanel_list_addon_domains': 'WHM_API',
+  'whm_cpanel_get_addon_domain_details': 'WHM_API',
+  'whm_cpanel_get_addon_conversion_status': 'WHM_API',
+  'whm_cpanel_create_addon_conversion': 'WHM_API',
+  'whm_cpanel_get_addon_conversion_details': 'WHM_API',
+  'whm_cpanel_list_addon_conversions': 'WHM_API',
+  'whm_cpanel_check_domain_authority': 'WHM_API',
+  'whm_cpanel_get_dnssec_ds_records': 'WHM_API',
+  'whm_cpanel_enable_dnssec_nsec3': 'WHM_API',
+  'whm_cpanel_disable_dnssec_nsec3': 'WHM_API',
+  'whm_cpanel_get_nsec3_operation_status': 'WHM_API',
+  'whm_cpanel_update_userdomains_cache': 'WHM_API',
 
   // DNS
-  'dns_list_zones': 'DNS',
-  'dns_get_zone': 'DNS',
-  'dns_add_record': 'DNS',
-  'dns_edit_record': 'DNS',
-  'dns_delete_record': 'DNS',
-  'dns_reset_zone': 'DNS',
+  'whm_cpanel_list_dns_zones': 'DNS',
+  'whm_cpanel_get_dns_zone_records': 'DNS',
+  'whm_cpanel_check_dns_nested_subdomains': 'DNS',
+  'whm_cpanel_search_dns_record': 'DNS',
+  'whm_cpanel_create_dns_record': 'DNS',
+  'whm_cpanel_update_dns_record': 'DNS',
+  'whm_cpanel_delete_dns_record': 'DNS',
+  'whm_cpanel_reset_dns_zone': 'DNS',
+  'whm_cpanel_list_dns_mx_records': 'DNS',
+  'whm_cpanel_create_dns_mx_record': 'DNS',
+  'whm_cpanel_check_dns_alias_available': 'DNS',
 
   // SSH
-  'system_restart_service': 'SSH',
-  'system_get_load': 'SSH',
-  'log_read_last_lines': 'SSH',
+  'whm_cpanel_restart_system_service': 'SSH',
+  'whm_cpanel_get_system_load_metrics': 'SSH',
+  'whm_cpanel_read_system_log_lines': 'SSH',
 
   // File
-  'file_list': 'FILE',
-  'file_read': 'FILE',
-  'file_write': 'FILE',
-  'file_delete': 'FILE'
+  'whm_cpanel_list_user_files': 'FILE',
+  'whm_cpanel_read_user_file': 'FILE',
+  'whm_cpanel_write_user_file': 'FILE',
+  'whm_cpanel_delete_user_file': 'FILE'
 };
 
 /**

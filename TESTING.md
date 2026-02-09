@@ -19,7 +19,7 @@ export MCP_SAFETY_TOKEN="CHANGE_ME_CONFIRMATION"
 export MCP_ACL_TOKEN="root:admin"  # ou reseller:meu_reseller / user:cpaneluser
 ```
 
-> ⚠️ **SafetyGuard**: domain_delete, domain_addon_start_conversion, domain_enable_nsec3, domain_disable_nsec3, domain_update_userdomains, dns_delete_record e file_delete exigem token + `reason` (>=10 chars).
+> ⚠️ **SafetyGuard**: whm_cpanel_delete_domain, whm_cpanel_create_addon_conversion, whm_cpanel_enable_dnssec_nsec3, whm_cpanel_disable_dnssec_nsec3, whm_cpanel_update_userdomains_cache, whm_cpanel_delete_dns_record e whm_cpanel_delete_user_file exigem token + `reason` (>=10 chars).
 
 ---
 
@@ -311,47 +311,47 @@ Verificar dns_*, whm_*, system_*, file_*, log_*
 ### AC03: Listar Contas WHM
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_list_accounts","arguments":{}},"id":2}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_accounts","arguments":{}},"id":2}'
 ```
 
 ### AC04: SSH Seguro (não existe ssh_execute)
 - Chamada para ssh_execute → erro -32601
-- `system_restart_service` com serviço permitido → success
+- `whm_cpanel_restart_system_service` com serviço permitido → success
 - Serviço não permitido → -32602 com allowed_services
-- `log_read_last_lines` em arquivo permitido → success
+- `whm_cpanel_read_system_log_lines` em arquivo permitido → success
 - Arquivo não autorizado → -32000 Unauthorized log file access
 
 ### AC05: Arquivos cPanel
-- `file_list`, `file_read`, `file_write` (com SafetyGuard), `file_delete` (SafetyGuard)
+- `whm_cpanel_list_user_files`, `whm_cpanel_read_user_file`, `whm_cpanel_write_user_file` (com SafetyGuard), `whm_cpanel_delete_user_file` (SafetyGuard)
 
 ### AC06: Listar Zonas DNS
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_list_zones","arguments":{}},"id":9}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_dns_zones","arguments":{}},"id":9}'
 ```
 
 ### AC07: Obter Zona DNS Completa
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_get_zone","arguments":{"zone":"cliente1.com.br"}},"id":10}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_get_dns_zone_records","arguments":{"zone":"cliente1.com.br"}},"id":10}'
 ```
 
 ### AC08: Adicionar Registro DNS (A/CNAME)
-- `dns_add_record` com A ou CNAME
-- `dns_edit_record` com optimistic locking (expected_content)
-- `dns_reset_zone`
+- `whm_cpanel_create_dns_record` com A ou CNAME
+- `whm_cpanel_update_dns_record` com optimistic locking (expected_content)
+- `whm_cpanel_reset_dns_zone`
 
 ### AC09: Deletar Registro DNS
 ```bash
 curl -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns_delete_record","arguments":{"zone":"cliente1.com.br","line":15,"confirmationToken":"'$MCP_SAFETY_TOKEN'","reason":"Remocao do registro legado solicitada pelo cliente"}},"id":15}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_delete_dns_record","arguments":{"zone":"cliente1.com.br","line":15,"confirmationToken":"'$MCP_SAFETY_TOKEN'","reason":"Remocao do registro legado solicitada pelo cliente"}},"id":15}'
 ```
 
 ### AC10: Segurança de Credenciais
 - Verificar logs não contêm tokens; buscar `[REDACTED]` nos logs.
 
 ### AC11: Zona DNS Inexistente
-- `dns_get_zone` com zona inválida → erro "Zone Not Found" + sugestão
+- `whm_cpanel_get_dns_zone_records` com zona inválida → erro "Zone Not Found" + sugestão
 
 ### AC12: PM2 Estabilidade
 - `pm2 list | grep mcp-whm-cpanel`
@@ -369,4 +369,4 @@ curl -X GET $MCP_HOST/metrics
 - WHM timeout 30s, SSH 60s, DNS 45s → erro "Operation timed out after <x>s".
 
 ### AC18: WHM 200 com metadata.result=0
-- `dns_add_record` com domínio inválido deve retornar erro mapeado mostrando `whm_metadata_result: 0`.
+- `whm_cpanel_create_dns_record` com domínio inválido deve retornar erro mapeado mostrando `whm_metadata_result: 0`.

@@ -262,7 +262,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.listZones(),
         getTimeoutByType('DNS'),
-        'dns_list_zones'
+        'whm_cpanel_list_dns_zones'
       );
 
       const zones = (result.data?.zone || []).map(z => ({
@@ -334,7 +334,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns_get_zone'
+        'whm_cpanel_get_dns_zone_records'
       );
 
       // Verificar se zona existe
@@ -490,7 +490,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.addZoneRecord(zone, type, name, data),
         getTimeoutByType('DNS'),
-        'dns_add_record'
+        'whm_cpanel_create_dns_record'
       );
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
@@ -554,7 +554,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.editZoneRecord(zone, line, data),
         getTimeoutByType('DNS'),
-        'dns_edit_record'
+        'whm_cpanel_update_dns_record'
       );
 
       // Validar zona apos modificacao
@@ -636,7 +636,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.removeZoneRecord(zone, line),
         getTimeoutByType('DNS'),
-        'dns_delete_record'
+        'whm_cpanel_delete_dns_record'
       );
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
@@ -687,7 +687,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.resetZone(zone),
         getTimeoutByType('DNS'),
-        'dns_reset_zone'
+        'whm_cpanel_reset_dns_zone'
       );
 
       // Obter zona apos reset
@@ -755,7 +755,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns_check_nested_domains'
+        'whm_cpanel_check_dns_nested_subdomains'
       );
 
       // Verificar se zona existe
@@ -855,7 +855,7 @@ class DNSService {
       const result = await withTimeout(
         () => this.whm.getZone(validatedZone),
         getTimeoutByType('DNS'),
-        'dns_search_record'
+        'whm_cpanel_search_dns_record'
       );
 
       // Verificar se zona existe

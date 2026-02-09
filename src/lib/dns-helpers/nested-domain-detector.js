@@ -40,8 +40,8 @@ function detectNestedDomains(zoneRecords, baseDomain) {
   let recommendation = null;
 
   if (level1Count > VALIDATION_RULES.RESPONSE.WARNING_THRESHOLD) {
-    warning = `⚠️ Zona com muitos subdomínios (${level1Count} registros de nível 1) - use filtros ou dns_search_record!`;
-    recommendation = 'Use dns_search_record para buscar registros específicos ou dns_get_zone com filtros';
+    warning = `⚠️ Zona com muitos subdomínios (${level1Count} registros de nível 1) - use filtros ou whm_cpanel_search_dns_record!`;
+    recommendation = 'Use whm_cpanel_search_dns_record para buscar registros específicos ou whm_cpanel_get_dns_zone_records com filtros';
   } else if (totalRecords > VALIDATION_RULES.RESPONSE.MAX_RECORDS_DEFAULT) {
     warning = `⚠️ Zona grande com ${totalRecords} registros - considere usar filtros`;
     recommendation = 'Use parâmetros max_records, record_type ou name_filter para limitar resultados';
@@ -93,8 +93,8 @@ function generateOptimizationSuggestions(analysis) {
     suggestions.push({
       severity: 'high',
       message: `Zona possui ${analysis.byLevel.level1} subdomínios de nível 1`,
-      action: 'Use dns_search_record para buscar registros específicos em vez de obter toda a zona',
-      example: `dns_search_record({ zone: "${analysis.zone}", name: "prometheus", type: ["A", "AAAA"] })`
+      action: 'Use whm_cpanel_search_dns_record para buscar registros específicos em vez de obter toda a zona',
+      example: `whm_cpanel_search_dns_record({ zone: "${analysis.zone}", name: "prometheus", type: ["A", "AAAA"] })`
     });
   }
 
@@ -102,8 +102,8 @@ function generateOptimizationSuggestions(analysis) {
     suggestions.push({
       severity: 'medium',
       message: `Zona contém ${analysis.totalRecords} registros no total`,
-      action: 'Use filtros em dns_get_zone para limitar quantidade de registros retornados',
-      example: `dns_get_zone({ zone: "${analysis.zone}", record_type: "A", max_records: 100 })`
+      action: 'Use filtros em whm_cpanel_get_dns_zone_records para limitar quantidade de registros retornados',
+      example: `whm_cpanel_get_dns_zone_records({ zone: "${analysis.zone}", record_type: "A", max_records: 100 })`
     });
   }
 

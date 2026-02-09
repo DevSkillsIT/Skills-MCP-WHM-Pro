@@ -8,7 +8,7 @@
 
 ## Problema Resolvido
 
-**Situação:** Tool `dns_get_zone` retornou 25k+ tokens ao consultar `skillsit.com.br` (centenas de subdomínios)
+**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou 25k+ tokens ao consultar `skillsit.com.br` (centenas de subdomínios)
 
 **Causa Raiz:** No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um subdomínio aninhado:
 - Exemplo: Conta `skillsit.com.br` + registra `cliente.com.br` = cria `cliente.skillsit.com.br`
@@ -204,19 +204,19 @@
       level2: 38,    // app.tools.skillsit.com.br
       level3plus: 5  // deep.nested.app.tools.skillsit.com.br
     },
-    warning: "⚠️ Zona com muitos subdomínios - use filtros ou dns_search_record!",
+    warning: "⚠️ Zona com muitos subdomínios - use filtros ou whm_cpanel_search_dns_record!",
     examples: {
       level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
       level2: ["app.tools.skillsit.com.br"],
       level3plus: []
     },
-    recommendation: "Use dns_search_record para buscar registros específicos",
+    recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos",
     suggestions: [
       {
         severity: "high",
         message: "Zona possui 287 subdomínios de nível 1",
-        action: "Use dns_search_record para buscar registros específicos",
-        example: "dns_search_record({ zone: '...', name: 'prometheus', type: ['A', 'AAAA'] })"
+        action: "Use whm_cpanel_search_dns_record para buscar registros específicos",
+        example: "whm_cpanel_search_dns_record({ zone: '...', name: 'prometheus', type: ['A', 'AAAA'] })"
       }
     ]
   }
