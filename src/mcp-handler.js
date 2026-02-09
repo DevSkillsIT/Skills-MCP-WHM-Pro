@@ -222,7 +222,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_restart_service',
-      description: 'Reinicio de servico via API do WHM/cPanel — reinicializa daemon para aplicar configuracoes ou resolver travamentos. Use no WHM quando precisar reiniciar httpd, mysql, named, postfix, dovecot, exim, nginx ou pure-ftpd. Requer confirmationToken e motivo. Diferente de whm_cpanel_restart_system_service que usa SSH.',
+      description: 'Reinicio de servico via API do WHM/cPanel — reinicializa daemon para aplicar configuracoes ou resolver travamentos. Causa indisponibilidade temporaria. Use no WHM para reiniciar httpd, mysql, named, exim, nginx ou pure-ftpd. Requer confirmationToken. Diferente de whm_cpanel_restart_system_service que usa SSH.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -313,7 +313,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_delete_domain',
-      description: 'Remocao de dominio, addon ou subdominio no WHM/cPanel — deleta configuracao de dominio da conta. Use no WHM quando dominio nao for mais necessario. Arquivos no docroot nao sao deletados automaticamente. Requer tipo (addon, parked, subdomain), confirmationToken e motivo detalhado para auditoria no WHM.',
+      description: 'Remocao de dominio, addon ou subdominio no WHM/cPanel — deleta configuracao de dominio da conta. Operacao destrutiva e irreversivel. Use no WHM apenas quando dominio nao for mais necessario. Requer tipo (addon, parked, subdomain), confirmationToken e motivo detalhado para auditoria no WHM/cPanel.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -375,7 +375,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_create_addon_conversion',
-      description: 'Conversao de addon domain para conta independente no WHM/cPanel — migracao de dominio para hospedagem propria com recursos dedicados. Use no WHM quando cliente precisar de conta separada para addon domain. Requer confirmationToken e motivo. Retorna conversion_id para polling via whm_cpanel_get_addon_conversion_status.',
+      description: 'Conversao de addon domain para conta independente no WHM/cPanel — migracao estrutural de dominio para hospedagem propria. Alteracao irreversivel que afeta estrutura de contas. Use no WHM quando cliente precisar de conta separada. Requer confirmationToken. Retorna conversion_id para polling no cPanel.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -434,7 +434,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_enable_dnssec_nsec3',
-      description: 'NSEC3 e DNSSEC aprimorado, protecao contra zone walking no WHM/cPanel — habilita seguranca avancada de DNS. Use no WHM quando precisar fortalecer protecao DNS de dominios. Aceita ate 50 dominios. Operacao assincrona que retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status.',
+      description: 'NSEC3 e DNSSEC aprimorado, protecao contra zone walking no WHM/cPanel — habilita seguranca avancada de DNS. Altera resolucao DNS dos dominios afetados. Aceita ate 50 dominios. Requer confirmationToken. Operacao assincrona que retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status no WHM.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -447,7 +447,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_disable_dnssec_nsec3',
-      description: 'Desativacao de NSEC3, reversao para NSEC padrao no WHM/cPanel — remove protecao avancada de DNSSEC em dominios. Use no WHM quando precisar desabilitar NSEC3 em dominios especificos. Aceita ate 50 dominios. Requer confirmationToken. Retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status.',
+      description: 'Desativacao de NSEC3, reversao para NSEC padrao no WHM/cPanel — remove protecao avancada de DNSSEC. Reduz seguranca DNS dos dominios afetados. Aceita ate 50 dominios. Requer confirmationToken. Operacao assincrona que retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status no WHM.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -471,7 +471,7 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_update_userdomains_cache',
-      description: 'Cache de dominios, mapeamento /etc/userdomains no WHM/cPanel — sincroniza associacao entre dominios e usuarios. Use no WHM apenas para corrigir inconsistencias apos migracoes ou quando dominios nao resolvem para suas contas. Requer confirmationToken. Operacao protegida contra concorrencia no servidor WHM.',
+      description: 'Cache de dominios, mapeamento /etc/userdomains no WHM/cPanel — sincroniza associacao entre dominios e usuarios. Pode afetar resolucao de dominios temporariamente. Use no WHM apenas para corrigir inconsistencias apos migracoes. Requer confirmationToken. Operacao protegida por lock no servidor WHM/cPanel.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -651,7 +651,7 @@ function buildToolDefinitions() {
     // ==========================================
     {
       name: 'whm_cpanel_restart_system_service',
-      description: 'Reinicio de servico via SSH, daemon e processo no WHM/cPanel — reinicializacao por conexao direta ao servidor. Use no WHM quando precisar reiniciar httpd, mysql, named, postfix, dovecot, exim, nginx ou pure-ftpd. Diferente de whm_cpanel_restart_service que usa API, esta executa via SSH no servidor WHM.',
+      description: 'Reinicio de servico via SSH, daemon e processo no WHM/cPanel — reinicializacao por conexao direta ao servidor. Causa indisponibilidade temporaria. Use no WHM para reiniciar httpd, mysql, named, exim, nginx ou pure-ftpd. Diferente de whm_cpanel_restart_service que usa API. Requer confirmationToken no WHM.',
       inputSchema: {
         type: 'object',
         properties: {
