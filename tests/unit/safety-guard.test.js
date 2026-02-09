@@ -25,7 +25,7 @@ describe('SafetyGuard', () => {
 
   it('permite operacao quando token e motivo corretos', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('file_delete', {
+      SafetyGuard.requireConfirmation('whm_cpanel_delete_user_file', {
         confirmationToken: 'unit-test-token',
         reason: 'Remocao solicitada pelo cliente'
       })
@@ -36,7 +36,7 @@ describe('SafetyGuard', () => {
     delete process.env.MCP_SAFETY_TOKEN;
 
     expect(() =>
-      SafetyGuard.requireConfirmation('file_delete', {
+      SafetyGuard.requireConfirmation('whm_cpanel_delete_user_file', {
         confirmationToken: 'qualquer',
         reason: 'motivo valido'
       })
@@ -45,7 +45,7 @@ describe('SafetyGuard', () => {
 
   it('falha quando token informado e invalido', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('file_delete', {
+      SafetyGuard.requireConfirmation('whm_cpanel_delete_user_file', {
         confirmationToken: 'token-errado',
         reason: 'motivo qualquer'
       })
@@ -54,7 +54,7 @@ describe('SafetyGuard', () => {
 
   it('falha quando motivo e muito curto', () => {
     expect(() =>
-      SafetyGuard.requireConfirmation('dns_reset_zone', {
+      SafetyGuard.requireConfirmation('whm_cpanel_reset_dns_zone', {
         confirmationToken: 'unit-test-token',
         reason: 'curto'
       })
@@ -66,7 +66,7 @@ describe('SafetyGuard', () => {
     delete process.env.MCP_SAFETY_TOKEN;
 
     expect(() =>
-      SafetyGuard.requireConfirmation('file_delete', {
+      SafetyGuard.requireConfirmation('whm_cpanel_delete_user_file', {
         confirmationToken: 'qualquer',
         reason: 'nao deveria validar'
       })

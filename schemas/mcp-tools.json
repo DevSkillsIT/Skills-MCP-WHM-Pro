@@ -1,11 +1,11 @@
 {
   "version": "1.0.0",
   "name": "skills-mcp-whm-pro",
-  "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, and monitoring capabilities",
+  "description": "MCP Server WHM/cPanel enterprise para gerenciamento de contas, DNS, servicos e arquivos com seguranca avancada",
   "tools": [
     {
-      "name": "whm_list_accounts",
-      "description": "List all cPanel accounts on the WHM server with detailed information including disk usage, bandwidth, and status",
+      "name": "whm_cpanel_list_accounts",
+      "description": "Contas de hospedagem, clientes e planos no WHM/cPanel — inventario completo de contas ativas e suspensas no servidor. Use no WHM quando precisar localizar conta, verificar status ou auditar ocupacao do servidor. Retorna array com username, dominio, email, pacote, uso de disco e status de cada conta no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -15,33 +15,33 @@
       "security": "read-only"
     },
     {
-      "name": "whm_create_account",
-      "description": "Create a new cPanel account with specified domain, username, password, and hosting package",
+      "name": "whm_cpanel_create_account",
+      "description": "Conta de hospedagem nova no WHM/cPanel — provisionamento de cliente com dominio, usuario e pacote configuraveis. Use no WHM quando precisar criar conta para novo cliente ou ambiente de teste. Requer confirmationToken. Retorna dados da conta criada incluindo usuario, dominio principal e IP atribuido no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "cPanel username (alphanumeric, max 16 chars)",
+            "description": "Usuario cPanel (alfanumerico, max 16 caracteres)",
             "pattern": "^[a-z0-9]{1,16}$"
           },
           "domain": {
             "type": "string",
-            "description": "Primary domain for the account",
+            "description": "Dominio principal da conta",
             "pattern": "^[a-z0-9.-]+\\.[a-z]{2,}$"
           },
           "password": {
             "type": "string",
-            "description": "Account password (min 8 chars, recommended strong password)"
+            "description": "Senha da conta (min 8 caracteres, recomendado senha forte)"
           },
           "email": {
             "type": "string",
-            "description": "Contact email address",
+            "description": "Email de contato do titular",
             "format": "email"
           },
           "package": {
             "type": "string",
-            "description": "Hosting package name (optional, defaults to 'default')"
+            "description": "Nome do pacote de hospedagem (padrao: 'default')"
           }
         },
         "required": ["username", "domain", "password"]
@@ -50,18 +50,18 @@
       "security": "write"
     },
     {
-      "name": "whm_suspend_account",
-      "description": "Suspend a cPanel account and prevent access. Useful for policy violations or non-payment",
+      "name": "whm_cpanel_suspend_account",
+      "description": "Suspensao de conta de hospedagem, cliente ou usuario no WHM/cPanel — bloqueia acesso ao cPanel, FTP e email. Use no WHM quando houver inadimplencia, violacao de termos ou manutencao programada. Dados preservados, operacao reversivel via whm_cpanel_unsuspend_account. Requer motivo visivel ao cliente.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "cPanel username to suspend"
+            "description": "Usuario cPanel a suspender"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for suspension (logged for audit)"
+            "description": "Motivo da suspensao (registrado em auditoria)"
           }
         },
         "required": ["username", "reason"]
@@ -70,14 +70,14 @@
       "security": "write"
     },
     {
-      "name": "whm_unsuspend_account",
-      "description": "Unsuspend a previously suspended cPanel account and restore access",
+      "name": "whm_cpanel_unsuspend_account",
+      "description": "Reativacao de conta suspensa, cliente ou hospedagem no WHM/cPanel — restaura acesso completo ao cPanel, FTP, email e website. Use no WHM quando o cliente regularizar pagamento ou motivo da suspensao for resolvido. Retorna confirmacao da reativacao e status atualizado da conta no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "cPanel username to unsuspend"
+            "description": "Usuario cPanel a reativar"
           }
         },
         "required": ["username"]
@@ -86,38 +86,38 @@
       "security": "write"
     },
     {
-      "name": "whm_terminate_account",
-      "description": "Permanently delete a cPanel account and all associated data. This action is IRREVERSIBLE. Requires confirmationToken.",
+      "name": "whm_cpanel_delete_account",
+      "description": "Remocao permanente de conta de hospedagem no WHM/cPanel — deleta arquivos, emails, bancos e configuracoes do cliente. Use no WHM apenas para cancelamento definitivo. Acao destrutiva e irreversivel. Requer confirmationToken, flag confirm=true e motivo detalhado para auditoria no WHM/cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "cPanel username to terminate"
+            "description": "Usuario cPanel a remover permanentemente"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token matching MCP_SAFETY_TOKEN environment variable"
+            "description": "Token de seguranca MCP_SAFETY_TOKEN obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for termination (logged for audit)"
+            "description": "Motivo da remocao (registrado em auditoria)"
           }
         },
-        "required": ["username", "confirmationToken", "reason"]
+        "required": ["username", "confirmation_token", "reason"]
       },
       "category": "WHM Account Management",
       "security": "destructive"
     },
     {
-      "name": "whm_get_account_summary",
-      "description": "Get detailed information about a specific cPanel account including usage statistics and configuration",
+      "name": "whm_cpanel_get_account_summary",
+      "description": "Resumo de conta de hospedagem, cliente e recursos no WHM/cPanel — dados detalhados de uso e configuracao. Use no WHM quando precisar verificar quota de disco, bandwidth ou alocacao de recursos de um cliente especifico. Retorna dominio, email, pacote, uso de disco e bandwidth da conta no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "username": {
             "type": "string",
-            "description": "cPanel username to query"
+            "description": "Usuario cPanel a consultar"
           }
         },
         "required": ["username"]
@@ -126,8 +126,8 @@
       "security": "read-only"
     },
     {
-      "name": "whm_server_status",
-      "description": "Get comprehensive server status including uptime, load average, memory usage, and service health",
+      "name": "whm_cpanel_get_server_status",
+      "description": "Status do servidor, saude e versao do WHM/cPanel — monitoramento geral incluindo load average e uptime. Use no WHM quando precisar verificar carga de CPU, confirmar versao instalada ou diagnosticar lentidao no servidor. Retorna metricas de carga para 1, 5 e 15 minutos e tempo de atividade do WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -137,14 +137,14 @@
       "security": "read-only"
     },
     {
-      "name": "whm_service_status",
-      "description": "Check the status of a specific service (httpd, mysql, named, etc.)",
+      "name": "whm_cpanel_get_services_status",
+      "description": "Servicos, daemons e processos do servidor WHM/cPanel — status de Apache, MySQL, DNS, FTP e email. Use no WHM quando precisar diagnosticar problemas de conectividade ou verificar se servicos estao operacionais. Retorna estado individual de cada servico: ativo, parado ou com falha no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "service": {
             "type": "string",
-            "description": "Service name to check",
+            "description": "Nome do servico a verificar",
             "enum": ["httpd", "mysql", "named", "postfix", "dovecot", "exim", "nginx", "pure-ftpd"]
           }
         },
@@ -154,33 +154,33 @@
       "security": "read-only"
     },
     {
-      "name": "whm_restart_service",
-      "description": "Restart a system service. Requires confirmationToken for safety.",
+      "name": "whm_cpanel_restart_service",
+      "description": "Reinicio de servico via API do WHM/cPanel — reinicializa daemon para aplicar configuracoes ou resolver travamentos. Use no WHM quando precisar reiniciar httpd, mysql, named, postfix, dovecot, exim, nginx ou pure-ftpd. Requer confirmationToken e motivo. Diferente de whm_cpanel_restart_system_service que usa SSH.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "service": {
             "type": "string",
-            "description": "Service name to restart",
+            "description": "Nome do servico a reiniciar",
             "enum": ["httpd", "mysql", "named", "postfix", "dovecot", "exim", "nginx", "pure-ftpd"]
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token matching MCP_SAFETY_TOKEN"
+            "description": "Token de seguranca MCP_SAFETY_TOKEN obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for restart (logged)"
+            "description": "Motivo do restart (registrado em auditoria)"
           }
         },
-        "required": ["service", "confirmationToken", "reason"]
+        "required": ["service", "confirmation_token", "reason"]
       },
       "category": "WHM System Management",
       "security": "write"
     },
     {
-      "name": "whm_list_domains",
-      "description": "List all domains across all cPanel accounts on the server",
+      "name": "whm_cpanel_list_all_domains",
+      "description": "Dominios, sites e hospedagens no WHM/cPanel — listagem paginada com filtros por tipo e nome. Use no WHM quando precisar buscar dominios por substring ou tipo (addon, alias, subdomain, main). Retorna array paginado com detalhes. Para dominio unico, prefira whm_cpanel_get_domain_data no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -190,8 +190,8 @@
       "security": "read-only"
     },
     {
-      "name": "dns_list_zones",
-      "description": "List all DNS zones managed by the WHM server with zone status and record counts",
+      "name": "whm_cpanel_list_dns_zones",
+      "description": "Zonas DNS, dominios e registros gerenciados no WHM/cPanel — inventario completo de zonas ativas no servidor. Use no WHM quando precisar visualizar todos os dominios com DNS configurado ou localizar zona para edicao. Retorna array de zonas DNS com status. Consulta somente leitura sem parametros no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -201,14 +201,14 @@
       "security": "read-only"
     },
     {
-      "name": "dns_get_zone",
-      "description": "Get complete DNS zone records for a specific domain including A, AAAA, CNAME, MX, TXT, NS records",
+      "name": "whm_cpanel_get_dns_zone_records",
+      "description": "Registros DNS, entradas e configuracao de zona no WHM/cPanel — visualizacao completa com filtros por tipo e nome. Use no WHM quando precisar ver todos os registros de um dominio. Retorna lista numerada por linha com tipo, nome e valor. Para registro especifico, prefira whm_cpanel_search_dns_record no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "zone": {
             "type": "string",
-            "description": "Domain name (zone) to retrieve"
+            "description": "Nome da zona DNS (dominio) a consultar"
           }
         },
         "required": ["zone"]
@@ -217,47 +217,47 @@
       "security": "read-only"
     },
     {
-      "name": "dns_add_record",
-      "description": "Add a new DNS record to a zone. Supports A, AAAA, CNAME, MX, TXT, NS, PTR record types",
+      "name": "whm_cpanel_create_dns_record",
+      "description": "Registro DNS novo, entrada e apontamento em zona do WHM/cPanel — cria registros A, AAAA, CNAME, MX, TXT, NS ou PTR. Use no WHM para configurar apontamentos de dominio. Campos obrigatorios variam por tipo: address para A/AAAA, cname para CNAME, exchange para MX. Retorna confirmacao com linha criada no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "zone": {
             "type": "string",
-            "description": "Domain name (zone)"
+            "description": "Nome da zona DNS (dominio)"
           },
           "name": {
             "type": "string",
-            "description": "Record name (hostname)"
+            "description": "Nome do registro (subdominio ou @)"
           },
           "type": {
             "type": "string",
-            "description": "DNS record type",
+            "description": "Tipo de registro DNS",
             "enum": ["A", "AAAA", "CNAME", "MX", "TXT", "NS", "PTR"]
           },
           "address": {
             "type": "string",
-            "description": "IP address (for A/AAAA records)"
+            "description": "Endereco IP (para registros A/AAAA)"
           },
           "cname": {
             "type": "string",
-            "description": "Target hostname (for CNAME records)"
+            "description": "Hostname de destino (para registros CNAME)"
           },
           "exchange": {
             "type": "string",
-            "description": "Mail server hostname (for MX records)"
+            "description": "Hostname do servidor de email (para registros MX)"
           },
           "preference": {
             "type": "number",
-            "description": "MX priority (lower = higher priority)"
+            "description": "Prioridade MX (menor = maior prioridade)"
           },
           "txtdata": {
             "type": "string",
-            "description": "Text data (for TXT records)"
+            "description": "Conteudo texto (para registros TXT)"
           },
           "ttl": {
             "type": "number",
-            "description": "Time to live in seconds (default: 14400)"
+            "description": "Time to live em segundos (padrao: 14400)"
           }
         },
         "required": ["zone", "name", "type"]
@@ -266,102 +266,102 @@
       "security": "write"
     },
     {
-      "name": "dns_edit_record",
-      "description": "Edit an existing DNS record with optimistic locking to prevent race conditions. Requires expected_content for safety.",
+      "name": "whm_cpanel_update_dns_record",
+      "description": "Edicao de registro DNS, alteracao de IP ou conteudo em zona do WHM/cPanel — atualizacao com optimistic locking. Use no WHM quando precisar alterar IP, TTL ou dados de registro existente. Requer linha obtida via whm_cpanel_search_dns_record. Campo expected_content previne edicao concorrente no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "zone": {
             "type": "string",
-            "description": "Domain name (zone)"
+            "description": "Nome da zona DNS (dominio)"
           },
           "line": {
             "type": "number",
-            "description": "Line number of record to edit (from dns_get_zone)"
+            "description": "Numero da linha do registro (obtido via whm_cpanel_get_dns_zone_records)"
           },
           "expected_content": {
             "type": "string",
-            "description": "Current record content for optimistic locking"
+            "description": "Conteudo atual do registro para optimistic locking"
           },
           "new_content": {
             "type": "string",
-            "description": "New record content"
+            "description": "Novo conteudo do registro"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token for destructive operation"
+            "description": "Token de seguranca para operacao destrutiva"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for change (logged)"
+            "description": "Motivo da alteracao (registrado em auditoria)"
           }
         },
-        "required": ["zone", "line", "expected_content", "new_content", "confirmationToken", "reason"]
+        "required": ["zone", "line", "expected_content", "new_content", "confirmation_token", "reason"]
       },
       "category": "DNS Management",
       "security": "write"
     },
     {
-      "name": "dns_delete_record",
-      "description": "Delete a DNS record from a zone. Requires confirmationToken.",
+      "name": "whm_cpanel_delete_dns_record",
+      "description": "Remocao de registro DNS, exclusao de entrada em zona do WHM/cPanel — operacao destrutiva que afeta servicos dependentes. Use no WHM apenas com certeza que o registro nao e necessario. Execute whm_cpanel_search_dns_record antes para obter linha. Requer confirmationToken e motivo para auditoria no WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "zone": {
             "type": "string",
-            "description": "Domain name (zone)"
+            "description": "Nome da zona DNS (dominio)"
           },
           "line": {
             "type": "number",
-            "description": "Line number of record to delete"
+            "description": "Numero da linha do registro a excluir"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token"
+            "description": "Token de seguranca obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for deletion (logged)"
+            "description": "Motivo da exclusao (registrado em auditoria)"
           }
         },
-        "required": ["zone", "line", "confirmationToken", "reason"]
+        "required": ["zone", "line", "confirmation_token", "reason"]
       },
       "category": "DNS Management",
       "security": "destructive"
     },
     {
-      "name": "dns_reset_zone",
-      "description": "Reset DNS zone to default records. Destructive operation requiring confirmationToken.",
+      "name": "whm_cpanel_reset_dns_zone",
+      "description": "Reset de zona DNS, restauracao e limpeza de registros no WHM/cPanel — reverte zona ao estado padrao removendo customizacoes. Use no WHM apenas em ultimo recurso quando zona estiver corrompida ou inconsistente. Operacao destrutiva. Requer confirmationToken e motivo detalhado para auditoria no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "zone": {
             "type": "string",
-            "description": "Domain name (zone) to reset"
+            "description": "Nome da zona DNS (dominio) a resetar"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token"
+            "description": "Token de seguranca obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for reset (logged)"
+            "description": "Motivo do reset (registrado em auditoria)"
           }
         },
-        "required": ["zone", "confirmationToken", "reason"]
+        "required": ["zone", "confirmation_token", "reason"]
       },
       "category": "DNS Management",
       "security": "destructive"
     },
     {
-      "name": "system_restart_service",
-      "description": "Restart a system service from the allowlist. Safer alternative to arbitrary SSH commands.",
+      "name": "whm_cpanel_restart_system_service",
+      "description": "Reinicio de servico via SSH, daemon e processo no WHM/cPanel — reinicializacao por conexao direta ao servidor. Use no WHM quando precisar reiniciar httpd, mysql, named, postfix, dovecot, exim, nginx ou pure-ftpd. Diferente de whm_cpanel_restart_service que usa API, esta executa via SSH no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "service": {
             "type": "string",
-            "description": "Service name from allowlist"
+            "description": "Nome do servico da allowlist"
           }
         },
         "required": ["service"]
@@ -370,8 +370,8 @@
       "security": "write"
     },
     {
-      "name": "system_get_load",
-      "description": "Get server load averages (1min, 5min, 15min), memory usage, disk usage, and uptime",
+      "name": "whm_cpanel_get_system_load_metrics",
+      "description": "Metricas de carga, CPU e memoria do servidor WHM/cPanel — monitoramento de recursos via SSH em tempo real. Use no WHM quando precisar diagnosticar lentidao ou monitorar performance do servidor. Retorna load average de 1, 5 e 15 minutos, memoria RAM livre e espaco em disco disponivel no WHM/cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -381,41 +381,41 @@
       "security": "read-only"
     },
     {
-      "name": "log_read_last_lines",
-      "description": "Read last N lines from a whitelisted log file. Access restricted to /var/log/* and /usr/local/cpanel/logs/*",
+      "name": "whm_cpanel_read_system_log_lines",
+      "description": "Logs do sistema, registros de erro e diagnostico no WHM/cPanel — leitura das ultimas linhas via SSH. Use no WHM quando precisar verificar erros recentes ou analisar logs de servico. Retorna ultimas N linhas. Caminhos permitidos: /var/log/*, /usr/local/apache/logs/*, /usr/local/cpanel/logs/*. Padrao: 50 no WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
-          "logfile": {
+          "log_file": {
             "type": "string",
-            "description": "Log file path (must be in whitelist)"
+            "description": "Caminho do arquivo de log (deve estar na whitelist)"
           },
           "lines": {
             "type": "number",
-            "description": "Number of lines to read (max: 1000)",
+            "description": "Quantidade de linhas a ler (max: 1000)",
             "minimum": 1,
             "maximum": 1000,
             "default": 50
           }
         },
-        "required": ["logfile"]
+        "required": ["log_file"]
       },
       "category": "Log Management",
       "security": "read-only"
     },
     {
-      "name": "file_list",
-      "description": "List files and directories in a cPanel account's directory. Path validation ensures access only within /home/{username}",
+      "name": "whm_cpanel_list_user_files",
+      "description": "Arquivos, diretorios e documentos de conta cPanel no WHM — navegacao na estrutura do home do usuario. Use no WHM quando precisar explorar arquivos de um cliente ou localizar configuracoes. Restrito a /home/{usuario} por seguranca do WHM. Retorna listagem com nomes, tamanhos e datas de modificacao.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cpanel_user": {
             "type": "string",
-            "description": "cPanel username"
+            "description": "Usuario cPanel proprietario dos arquivos"
           },
           "path": {
             "type": "string",
-            "description": "Directory path (relative to /home/{username})"
+            "description": "Caminho do diretorio (relativo a /home/{username})"
           }
         },
         "required": ["cpanel_user"]
@@ -424,18 +424,18 @@
       "security": "read-only"
     },
     {
-      "name": "file_read",
-      "description": "Read content of a file within a cPanel account's directory. Path validation enforced.",
+      "name": "whm_cpanel_read_user_file",
+      "description": "Conteudo de arquivo, codigo e configuracao de conta cPanel no WHM — leitura de documentos do home do usuario. Use no WHM quando precisar visualizar .htaccess, index.php ou diagnosticar problemas em arquivos do cliente. Restrito a /home/{usuario} por seguranca contra path traversal. Consulta somente leitura no WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cpanel_user": {
             "type": "string",
-            "description": "cPanel username"
+            "description": "Usuario cPanel proprietario do arquivo"
           },
           "file_path": {
             "type": "string",
-            "description": "File path (relative to /home/{username})"
+            "description": "Caminho do arquivo (relativo a /home/{username})"
           }
         },
         "required": ["cpanel_user", "file_path"]
@@ -444,81 +444,81 @@
       "security": "read-only"
     },
     {
-      "name": "file_write",
-      "description": "Write content to a file in a cPanel account. Creates automatic backup before overwrite. Requires confirmationToken.",
+      "name": "whm_cpanel_write_user_file",
+      "description": "Escrita de arquivo, configuracao e documento em conta cPanel no WHM — cria ou atualiza conteudo no home do usuario. Use no WHM quando precisar editar .htaccess, wp-config ou configuracoes do cliente. Backup automatico antes de sobrescrever. Requer confirmationToken. Restrito a /home/{usuario} no WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cpanel_user": {
             "type": "string",
-            "description": "cPanel username"
+            "description": "Usuario cPanel proprietario do arquivo"
           },
           "file_path": {
             "type": "string",
-            "description": "File path (relative to /home/{username})"
+            "description": "Caminho do arquivo (relativo a /home/{username})"
           },
           "content": {
             "type": "string",
-            "description": "File content to write"
+            "description": "Conteudo a escrever no arquivo"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token"
+            "description": "Token de seguranca obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for write (logged)"
+            "description": "Motivo da escrita (registrado em auditoria)"
           }
         },
-        "required": ["cpanel_user", "file_path", "content", "confirmationToken", "reason"]
+        "required": ["cpanel_user", "file_path", "content", "confirmation_token", "reason"]
       },
       "category": "File Management",
       "security": "write"
     },
     {
-      "name": "file_delete",
-      "description": "Delete a file from a cPanel account. Requires confirmationToken for safety.",
+      "name": "whm_cpanel_delete_user_file",
+      "description": "Remocao de arquivo, documento e conteudo de conta cPanel no WHM — delecao permanente no home do usuario. Use no WHM apenas quando tiver certeza que o arquivo nao e necessario. Operacao destrutiva e irreversivel. Restrito a /home/{usuario} por seguranca. Requer confirmationToken e motivo no WHM/cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
           "cpanel_user": {
             "type": "string",
-            "description": "cPanel username"
+            "description": "Usuario cPanel proprietario do arquivo"
           },
           "file_path": {
             "type": "string",
-            "description": "File path to delete"
+            "description": "Caminho do arquivo a excluir"
           },
-          "confirmationToken": {
+          "confirmation_token": {
             "type": "string",
-            "description": "Safety token"
+            "description": "Token de seguranca obrigatorio"
           },
           "reason": {
             "type": "string",
-            "description": "Reason for deletion (logged)"
+            "description": "Motivo da exclusao (registrado em auditoria)"
           }
         },
-        "required": ["cpanel_user", "file_path", "confirmationToken", "reason"]
+        "required": ["cpanel_user", "file_path", "confirmation_token", "reason"]
       },
       "category": "File Management",
       "security": "destructive"
     }
   ],
   "security_levels": {
-    "read-only": "Safe operations that only retrieve information",
-    "write": "Operations that modify configuration or data",
-    "destructive": "Dangerous operations that delete data or reset configurations. Require confirmationToken."
+    "read-only": "Operacoes seguras que apenas consultam informacoes do servidor WHM/cPanel",
+    "write": "Operacoes que modificam configuracao ou dados no servidor WHM/cPanel",
+    "destructive": "Operacoes perigosas que excluem dados ou resetam configuracoes. Exigem confirmationToken obrigatorio."
   },
   "features": [
-    "Enterprise-grade security with API Key authentication",
-    "Advanced DNS management with optimistic locking",
-    "Safety Guard system preventing accidental data loss",
-    "Prometheus metrics for production monitoring",
-    "Exponential backoff retry logic for resilience",
-    "Configurable timeouts via environment variables",
-    "Automatic credential sanitization in logs",
-    "Path validation preventing directory traversal",
-    "SSH operation allowlist (no RCE vulnerabilities)",
-    "Automatic file backups before overwrite"
+    "Seguranca enterprise com autenticacao por API Key",
+    "Gerenciamento avancado de DNS com optimistic locking",
+    "Sistema Safety Guard para prevenir perda acidental de dados",
+    "Metricas Prometheus para monitoramento em producao",
+    "Logica de retry com backoff exponencial para resiliencia",
+    "Timeouts configuraveis via variaveis de ambiente",
+    "Sanitizacao automatica de credenciais em logs",
+    "Validacao de caminho prevenindo directory traversal",
+    "Allowlist SSH para operacoes de sistema (sem vulnerabilidade RCE)",
+    "Backup automatico de arquivos antes de sobrescrita"
   ]
 }

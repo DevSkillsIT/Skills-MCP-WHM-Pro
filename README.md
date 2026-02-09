@@ -95,7 +95,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 ### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
 
 - **22 novas tools `domain.*`/`dns.*`** cobrindo usuário, owner, resolução, MX, DS/DNSSEC, NSEC3 enable/disable com polling, update_userdomains e verificação de autoridade
-- **Paginacao obrigatoria** em `domain.get_all_info` (`limit/offset/filter`) com metadados `has_more/next_offset`
+- **Paginacao obrigatoria** em `whm_cpanel_list_all_domains` (`limit/offset/filter`) com metadados `has_more/next_offset`
 - **Addon conversions end-to-end**: listar, detalhes, iniciar conversão (SafetyGuard) e status via `conversion_id`
 - **DNSSEC & NSEC3**: operações assíncronas com `operation_id`, timeout dinâmico `60s + 30s * dom` (máx 600s) e `domain.get_nsec3_status` para polling
 - **MX e ALIAS com idempotência e clareza**: `dns.add_mx` evita duplicatas, `dns.check_alias_available` retorna erro claro se o endpoint não existir no WHM, `domain.get_ds_records` responde com fallback quando DNSSEC não está habilitado
@@ -409,7 +409,7 @@ curl -X POST http://localhost:3100/mcp \
     "jsonrpc": "2.0",
     "method": "tools/call",
     "params": {
-      "name": "whm.list_accounts",
+      "name": "whm_cpanel_list_accounts",
       "arguments": {}
     },
     "id": 1
@@ -424,23 +424,23 @@ curl -X POST http://localhost:3100/mcp \
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
-| `whm.list_accounts` | List all cPanel accounts | Read-only |
-| `whm.create_account` | Create new cPanel account | Write |
-| `whm.suspend_account` | Suspend cPanel account | Write |
-| `whm.unsuspend_account` | Unsuspend cPanel account | Write |
-| `whm.terminate_account` | Permanently delete account | Destructive ⚠️ |
-| `whm.get_account_summary` | Get detailed account info | Read-only |
-| `whm.server_status` | Server status & uptime | Read-only |
-| `whm.service_status` | Service status (httpd, mysql, etc.) | Read-only |
-| `whm.restart_service` | Restart WHM service (SafetyGuard) | Write |
-| `whm.list_domains` | List domains of an account | Read-only |
+| `whm_cpanel_list_accounts` | List all cPanel accounts | Read-only |
+| `whm_cpanel_create_account` | Create new cPanel account | Write |
+| `whm_cpanel_suspend_account` | Suspend cPanel account | Write |
+| `whm_cpanel_unsuspend_account` | Unsuspend cPanel account | Write |
+| `whm_cpanel_delete_account` | Permanently delete account | Destructive ⚠️ |
+| `whm_cpanel_get_account_summary` | Get detailed account info | Read-only |
+| `whm_cpanel_get_server_status` | Server status & uptime | Read-only |
+| `whm_cpanel_get_services_status` | Service status (httpd, mysql, etc.) | Read-only |
+| `whm_cpanel_restart_service` | Restart WHM service (SafetyGuard) | Write |
+| `whm_cpanel_list_account_domains` | List domains of an account | Read-only |
 
 ### Domain Information (3)
 
 | Tool | Description | Security Level |
 |------|-------------|----------------|
 | `domain.get_user_data` | User data for a domain | Read-only |
-| `domain.get_all_info` | Paginated domain listing (`limit/offset/filter`) | Read-only |
+| `whm_cpanel_list_all_domains` | Paginated domain listing (`limit/offset/filter`) | Read-only |
 | `domain.get_owner` | Owner (cPanel account) of a domain | Read-only |
 
 ### Domain Management & Safety (5)
@@ -543,9 +543,9 @@ npx skills-whm-mcp help
 ```
 Available MCP Tools (47 total):
 
- 1. whm.list_accounts      - List all cPanel accounts on the WHM server...
- 2. whm.create_account     - Create a new cPanel account with specified...
- 3. whm.suspend_account    - Suspend a cPanel account and prevent access...
+ 1. whm_cpanel_list_accounts      - List all cPanel accounts on the WHM server...
+ 2. whm_cpanel_create_account     - Create a new cPanel account with specified...
+ 3. whm_cpanel_suspend_account    - Suspend a cPanel account and prevent access...
 ...
 
 Categories:
@@ -661,20 +661,20 @@ Skills MCP WHM Pro is designed to work with natural language:
 > Ajuste `MCP_HOST`, `MCP_API_KEY`, `MCP_SAFETY_TOKEN`, `MCP_ACL_TOKEN`, domínios e usuários antes de usar.
 
 #### WHM Account & Server
-- `whm.list_accounts`:
+- `whm_cpanel_list_accounts`:
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.list_accounts","arguments":{}},"id":1}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_accounts","arguments":{}},"id":1}'
 ```
-- `whm.create_account`:
+- `whm_cpanel_create_account`:
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.create_account","arguments":{"username":"newcp","domain":"newcp.com.br","password":"S3nh@F0rte","email":"ops@exemplo.com","package":"default","reason":"Onboarding cliente"}},"id":2}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_create_account","arguments":{"username":"newcp","domain":"newcp.com.br","password":"S3nh@F0rte","email":"ops@exemplo.com","package":"default","reason":"Onboarding cliente"}},"id":2}'
 ```
-- `whm.server_status` / `whm.service_status`:
+- `whm_cpanel_get_server_status` / `whm_cpanel_get_services_status`:
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm.service_status","arguments":{}},"id":3}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_get_services_status","arguments":{}},"id":3}'
 ```
 
 #### Domain Info (RF01-RF03, RNF07)
@@ -683,10 +683,10 @@ curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_user_data","arguments":{"domain":"exemplo.com.br"}},"id":10}'
 ```
-- `domain.get_all_info` (paginação):
+- `whm_cpanel_list_all_domains` (paginação):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_all_info","arguments":{"limit":50,"offset":0,"filter":"addon"}},"id":11}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_all_domains","arguments":{"limit":50,"offset":0,"filter":"addon"}},"id":11}'
 ```
 - `domain.get_owner`:
 ```bash
@@ -820,7 +820,7 @@ curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
 
 3) **Manutenção /etc/userdomains sem race condition**
    - Rodar `domain.update_userdomains` com SafetyGuard
-   - Em seguida, `whm.list_domains` para o usuário afetado e `domain.get_all_info` paginado para validar atualização
+   - Em seguida, `whm_cpanel_list_account_domains` para o usuário afetado e `whm_cpanel_list_all_domains` paginado para validar atualização
 
 4) **MX idempotente + resolução**
    - `dns.add_mx` duas vezes → segunda retorna `idempotent=true`
@@ -862,7 +862,7 @@ Destructive operations require a `confirmationToken` parameter matching the `MCP
 ```javascript
 // Example: Terminate account (destructive)
 {
-  "name": "whm.terminate_account",
+  "name": "whm_cpanel_delete_account",
   "arguments": {
     "username": "badaccount",
     "confirmationToken": "your-safety-token",

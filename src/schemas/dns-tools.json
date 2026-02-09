@@ -91,9 +91,9 @@
   },
 
   "tools": {
-    "dns_list_zones": {
-      "name": "dns_list_zones",
-      "description": "Lista todas as zonas DNS do servidor",
+    "whm_cpanel_list_dns_zones": {
+      "name": "whm_cpanel_list_dns_zones",
+      "description": "Zonas DNS, dominios e registros gerenciados no WHM/cPanel — inventario completo de zonas ativas no servidor. Use no WHM quando precisar visualizar todos os dominios com DNS configurado ou localizar zona para edicao. Retorna array de zonas DNS com status. Consulta somente leitura sem parametros no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {},
@@ -101,9 +101,9 @@
       }
     },
 
-    "dns_get_zone": {
-      "name": "dns_get_zone",
-      "description": "Obtem dump completo da zona DNS",
+    "whm_cpanel_get_dns_zone_records": {
+      "name": "whm_cpanel_get_dns_zone_records",
+      "description": "Registros DNS, entradas e configuracao de zona no WHM/cPanel — visualizacao completa com filtros por tipo e nome. Use no WHM quando precisar ver todos os registros de um dominio. Retorna lista numerada por linha com tipo, nome e valor. Para registro especifico, prefira whm_cpanel_search_dns_record no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -113,9 +113,9 @@
       }
     },
 
-    "dns_add_record": {
-      "name": "dns_add_record",
-      "description": "Adiciona registro DNS na zona",
+    "whm_cpanel_create_dns_record": {
+      "name": "whm_cpanel_create_dns_record",
+      "description": "Registro DNS novo, entrada e apontamento em zona do WHM/cPanel — cria registros A, AAAA, CNAME, MX, TXT, NS ou PTR. Use no WHM para configurar apontamentos de dominio. Campos obrigatorios variam por tipo: address para A/AAAA, cname para CNAME, exchange para MX. Retorna confirmacao com linha criada no cPanel.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -161,9 +161,9 @@
       }
     },
 
-    "dns_edit_record": {
-      "name": "dns_edit_record",
-      "description": "Edita registro DNS existente com suporte a optimistic locking",
+    "whm_cpanel_update_dns_record": {
+      "name": "whm_cpanel_update_dns_record",
+      "description": "Edicao de registro DNS, alteracao de IP ou conteudo em zona do WHM/cPanel — atualizacao com optimistic locking. Use no WHM quando precisar alterar IP, TTL ou dados de registro existente. Requer linha obtida via whm_cpanel_search_dns_record. Campo expected_content previne edicao concorrente no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -183,9 +183,9 @@
       }
     },
 
-    "dns_delete_record": {
-      "name": "dns_delete_record",
-      "description": "Remove registro DNS da zona",
+    "whm_cpanel_delete_dns_record": {
+      "name": "whm_cpanel_delete_dns_record",
+      "description": "Remocao de registro DNS, exclusao de entrada em zona do WHM/cPanel — operacao destrutiva que afeta servicos dependentes. Use no WHM apenas com certeza que o registro nao e necessario. Execute whm_cpanel_search_dns_record antes para obter linha. Requer confirmationToken e motivo para auditoria no WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {
@@ -197,9 +197,9 @@
       }
     },
 
-    "dns_reset_zone": {
-      "name": "dns_reset_zone",
-      "description": "Reseta zona para configuracao padrao",
+    "whm_cpanel_reset_dns_zone": {
+      "name": "whm_cpanel_reset_dns_zone",
+      "description": "Reset de zona DNS, restauracao e limpeza de registros no WHM/cPanel — reverte zona ao estado padrao removendo customizacoes. Use no WHM apenas em ultimo recurso quando zona estiver corrompida ou inconsistente. Operacao destrutiva. Requer confirmationToken e motivo detalhado para auditoria no servidor WHM.",
       "inputSchema": {
         "type": "object",
         "properties": {

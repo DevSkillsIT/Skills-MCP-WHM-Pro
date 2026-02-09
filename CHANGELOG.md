@@ -7,6 +7,24 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [1.5.1] - 2026-02-09
+
+### Modificado
+- **Renomeacao de tools**: Todas as tools WHM renomeadas do formato `whm.xxx` para `whm_cpanel_xxx` seguindo o padrao MCP de nomes com underscore
+  - `whm.list_accounts` -> `whm_cpanel_list_accounts`
+  - `whm.create_account` -> `whm_cpanel_create_account`
+  - `whm.get_account_summary` -> `whm_cpanel_get_account_summary`
+  - `whm.suspend_account` -> `whm_cpanel_suspend_account`
+  - `whm.unsuspend_account` -> `whm_cpanel_unsuspend_account`
+  - `whm.delete_account` -> `whm_cpanel_delete_account`
+  - `whm.change_package` -> `whm_cpanel_change_package`
+  - `whm.modify_account` -> `whm_cpanel_modify_account`
+  - `whm.server_status` -> `whm_cpanel_get_server_status`
+  - `whm.service_status` -> `whm_cpanel_get_services_status`
+- **CHANGELOG atualizado**: Todas as referencias a nomes antigos de tools substituidas pelo novo formato
+
+---
+
 ## [1.5.0] - 2025-12-10
 
 ### Adicionado
@@ -45,24 +63,24 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ## [1.4.0] - 2025-12-07
 
 ### Adicionado
-- **Suite de Domínios (SPEC-NOVAS-FEATURES-WHM-001)**: 22 novas tools `domain.*`/`dns.*` cobrindo usuário/owner, alias, subdomínio, resolução, autoridade local, MX, DS, ALIAS, conversões de addon e manutenção `/etc/userdomains`.
-- **Paginacao obrigatória** em `domain.get_all_info` (`limit/offset/filter`) com metadados `has_more/next_offset`.
-- **DNSSEC/NSEC3 assíncrono**: `domain.enable_nsec3` e `domain.disable_nsec3` retornam `operation_id`; `domain.get_nsec3_status` faz polling com timeout dinâmico `60s + 30s * dom` (máx 600s).
+- **Suite de Domínios (SPEC-NOVAS-FEATURES-WHM-001)**: 22 novas tools `whm_cpanel_*` cobrindo usuário/owner, alias, subdomínio, resolução, autoridade local, MX, DS, ALIAS, conversões de addon e manutenção `/etc/userdomains`.
+- **Paginacao obrigatória** em `whm_cpanel_list_all_domains` (`limit/offset/filter`) com metadados `has_more/next_offset`.
+- **DNSSEC/NSEC3 assíncrono**: `whm_cpanel_enable_dnssec_nsec3` e `whm_cpanel_disable_dnssec_nsec3` retornam `operation_id`; `whm_cpanel_get_nsec3_operation_status` faz polling com timeout dinâmico `60s + 30s * dom` (máx 600s).
 - **Segurança reforçada**: validação de domínio (RS01), validação de `document_root` (RS03), SafetyGuard via header `X-MCP-Safety-Token` (body tem precedência) e ACL propagado (`X-MCP-ACL-Token`/`Authorization`) para root/reseller/user.
-- **Idempotência**: `dns.add_mx` evita duplicatas; `domain.create_alias`/`domain.create_subdomain` e operações MX retornam flag `idempotent` quando já existem.
-- **Lock + transaction log**: `domain.update_userdomains` usa `lock-manager` e `transaction-log` para rollback seguro; NSEC3 registra operações assíncronas.
+- **Idempotência**: `whm_cpanel_create_dns_mx_record` evita duplicatas; `whm_cpanel_create_domain_alias`/`whm_cpanel_create_subdomain` e operações MX retornam flag `idempotent` quando já existem.
+- **Lock + transaction log**: `whm_cpanel_update_userdomains_cache` usa `lock-manager` e `transaction-log` para rollback seguro; NSEC3 registra operações assíncronas.
 - **Testes**: suites automatizadas para Fase 2/3 (MX idempotente, DS/ALIAS fallback, NSEC3 timeouts) e propagação de ACL token.
 
 ### Alterado
 - **Timeouts alinhados ao RNF01**: limite absoluto 600s; `withTimeout` aplicado aos endpoints WHM sensíveis (DS/ALIAS) para evitar travamentos.
-- **Contagem total de tools** atualizada para **45** (10 whm.*, 19 domain.*, 9 dns.*, 4 file/log/system).
+- **Contagem total de tools** atualizada para **45** (10 whm_cpanel_*, 19 domain_*, 9 dns_*, 4 file/log/system).
 - **Documentação**: README/TESTING revisados com novos exemplos de NSEC3, DS/ALIAS, paginacao e cabeçalhos de segurança; changelog anterior corrigido.
 - **SafetyGuard**: suporte explícito a header, com redacão de tokens nos logs.
 
 ### Corrigido
 - **DNSSEC/ALIAS**: chamadas agora retornam erro claro quando o endpoint não existe ou DNSSEC não está habilitado (em vez de timeout silencioso).
 - **ACL**: validação agora usa o token da requisição (`X-MCP-ACL-Token`/`Authorization`), impedindo uso involuntário do fallback root.
-- **MX duplicado**: `dns.add_mx` verifica registros existentes antes de criar.
+- **MX duplicado**: `whm_cpanel_create_dns_mx_record` verifica registros existentes antes de criar.
 
 ---
 
@@ -71,14 +89,14 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 ### Adicionado
 
 #### Gerenciamento de Contas WHM
-- **whm.list_accounts** - Listar todas as contas cPanel com filtros por domínio ou usuário
-- **whm.create_account** - Criar nova conta cPanel com validação de parâmetros
-- **whm.get_account_summary** - Obter informações detalhadas de uma conta
-- **whm.suspend_account** - Suspender conta com auditoria de razão
-- **whm.unsuspend_account** - Reativar conta suspensa
-- **whm.delete_account** - Deletar conta (requer confirmationToken)
-- **whm.change_package** - Alterar pacote de hospedagem de uma conta
-- **whm.modify_account** - Modificar configurações de conta (quota, etc.)
+- **whm_cpanel_list_accounts** - Listar todas as contas cPanel com filtros por domínio ou usuário
+- **whm_cpanel_create_account** - Criar nova conta cPanel com validação de parâmetros
+- **whm_cpanel_get_account_summary** - Obter informações detalhadas de uma conta
+- **whm_cpanel_suspend_account** - Suspender conta com auditoria de razão
+- **whm_cpanel_unsuspend_account** - Reativar conta suspensa
+- **whm_cpanel_delete_account** - Deletar conta (requer confirmationToken)
+- **whm_cpanel_change_package** - Alterar pacote de hospedagem de uma conta
+- **whm_cpanel_modify_account** - Modificar configurações de conta (quota, etc.)
 
 #### Gerenciamento de DNS
 - **dns.list_zones** - Listar todas as zonas DNS do servidor
@@ -90,8 +108,8 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - **dns.optimistic_lock** - Sistema de bloqueio otimista para prevenir race conditions
 
 #### Monitoramento e Sistema
-- **whm.server_status** - Status geral do servidor (uptime, load, memória, disco)
-- **whm.service_status** - Status de serviços específicos (httpd, mysql, exim)
+- **whm_cpanel_get_server_status** - Status geral do servidor (uptime, load, memória, disco)
+- **whm_cpanel_get_services_status** - Status de serviços específicos (httpd, mysql, exim)
 - **system.get_load** - Métricas detalhadas de carga e recursos
 - **log.read_last_lines** - Ler últimas linhas de logs do sistema
 

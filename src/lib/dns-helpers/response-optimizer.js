@@ -163,7 +163,7 @@ function optimizeForLargeZones(records) {
     optimizedCount: limited.returnedCount,
     limited: true,
     message: limited.warning,
-    recommendation: 'Use filtros (record_type, name_filter) ou dns_search_record para buscar registros específicos'
+    recommendation: 'Use filtros (record_type, name_filter) ou whm_cpanel_search_dns_record para buscar registros específicos'
   };
 }
 
@@ -179,7 +179,7 @@ function createZoneSummary(records, zone) {
       zone,
       totalRecords: 0,
       byType: {},
-      recommendation: 'Use dns_get_zone para obter registros da zona'
+      recommendation: 'Use whm_cpanel_get_dns_zone_records para obter registros da zona'
     };
   }
 
@@ -196,8 +196,8 @@ function createZoneSummary(records, zone) {
     byType,
     estimatedTokens: estimateTokenSize(records),
     recommendation: records.length > VALIDATION_RULES.RESPONSE.MAX_RECORDS_DEFAULT
-      ? 'Zona grande - use filtros em dns_get_zone ou dns_search_record'
-      : 'Use dns_get_zone para obter registros completos'
+      ? 'Zona grande - use filtros em whm_cpanel_get_dns_zone_records ou whm_cpanel_search_dns_record'
+      : 'Use whm_cpanel_get_dns_zone_records para obter registros completos'
   };
 }
 
