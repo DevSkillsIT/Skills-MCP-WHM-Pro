@@ -13,77 +13,77 @@ const WHM_PROMPTS = [
   // ============================================
   {
     name: 'whm_account_health_summary',
-    description: 'Resumo executivo de saúde das contas de hospedagem com alertas críticos',
+    description: 'Resumo executivo de saude das contas de hospedagem WHM/cPanel com alertas criticos. Publico: gestor. Retorna dashboard de contas ativas, suspensas e problemas do servidor WHM.',
     arguments: [
       {
         name: 'filter_suspended',
-        description: 'Filtrar apenas contas suspensas (true/false)',
+        description: 'Filtrar apenas contas suspensas (true/false). Opcional.',
         required: false
       }
     ]
   },
   {
     name: 'whm_resource_usage_trends',
-    description: 'Tendências de uso de recursos com alertas de capacidade',
+    description: 'Tendencias de uso de recursos e capacidade no WHM/cPanel. Publico: gestor. Retorna projecoes de disco, banda e CPU do servidor WHM com alertas.',
     arguments: [
       {
         name: 'period_days',
-        description: 'Período em dias para análise (padrão: 7)',
+        description: 'Periodo em dias para analise (padrao: 7). Opcional.',
         required: false
       }
     ]
   },
   {
     name: 'whm_security_posture',
-    description: 'Postura de segurança do servidor com vulnerabilidades identificadas',
+    description: 'Postura de seguranca do servidor WHM/cPanel com vulnerabilidades identificadas. Publico: gestor. Retorna scorecard de SSL, firewall e patches do WHM.',
     arguments: [
       {
         name: 'check_type',
-        description: 'Tipo de verificação: ssl, firewall, updates, all (padrão: all)',
+        description: 'Tipo de verificacao: ssl, firewall, updates, all (padrao: all). Opcional.',
         required: false
       }
     ]
   },
   {
     name: 'whm_ssl_certificate_inventory',
-    description: 'Inventário de certificados SSL com alertas de expiração',
+    description: 'Inventario de certificados SSL e seguranca no WHM/cPanel com alertas de expiracao. Publico: gestor. Retorna status de AutoSSL e certificados do servidor WHM.',
     arguments: [
       {
         name: 'expiring_days',
-        description: 'Alertar certificados expirando em X dias (padrão: 30)',
+        description: 'Alertar certificados expirando em X dias (padrao: 30). Opcional.',
         required: false
       }
     ]
   },
   {
     name: 'whm_backup_coverage',
-    description: 'Cobertura de backups com identificação de contas sem backup',
+    description: 'Cobertura de backups e copias de seguranca no WHM/cPanel com identificacao de contas desprotegidas. Publico: gestor. Retorna relatorio de restauracao e snapshots do WHM.',
     arguments: [
       {
         name: 'account_name',
-        description: 'Nome da conta (opcional para análise global)',
+        description: 'Nome da conta para analise especifica. Opcional, se omitido analisa todas.',
         required: false
       }
     ]
   },
   {
     name: 'whm_dns_zone_health',
-    description: 'Saúde de zonas DNS com verificação de propagação',
+    description: 'Saude de zonas DNS e apontamentos no WHM/cPanel com verificacao de propagacao. Publico: gestor. Retorna health check de registros e nameservers do WHM.',
     arguments: [
       {
         name: 'domain',
-        description: 'Domínio específico (opcional)',
+        description: 'Dominio especifico para analise DNS. Opcional, se omitido analisa todas as zonas.',
         required: false
       }
     ]
   },
   {
     name: 'whm_email_deliverability',
-    description: 'Análise de entregabilidade de emails com SPF/DKIM/DMARC',
+    description: 'Analise de entregabilidade de correio eletronico no WHM/cPanel com SPF/DKIM/DMARC. Publico: gestor. Retorna scorecard de MX, blacklists e autenticacao do WHM.',
     arguments: [
       {
         name: 'domain',
-        description: 'Domínio para análise (opcional)',
+        description: 'Dominio para analise de entregabilidade. Opcional, se omitido analisa todos.',
         required: false
       }
     ]
@@ -94,98 +94,98 @@ const WHM_PROMPTS = [
   // ============================================
   {
     name: 'whm_account_quick_lookup',
-    description: 'Busca rápida de conta por usuário, domínio ou IP',
+    description: 'Conta de hospedagem no WHM/cPanel — busca rapida por usuario, dominio ou IP. Publico: analista. Retorna info card compacto da conta no servidor WHM.',
     arguments: [
       {
         name: 'search_term',
-        description: 'Termo de busca (usuário, domínio ou IP)',
+        description: 'Termo de busca: usuario, dominio ou IP. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_dns_troubleshooting',
-    description: 'Troubleshoot de DNS com verificação de registros e propagação',
+    description: 'Troubleshoot de registros DNS e apontamentos no WHM/cPanel com verificacao de propagacao e nameservers. Publico: analista. Retorna diagnostico completo do WHM.',
     arguments: [
       {
         name: 'domain',
-        description: 'Domínio para diagnosticar',
+        description: 'Dominio para diagnosticar DNS. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_email_setup_guide',
-    description: 'Guia passo-a-passo para configuração de email',
+    description: 'Guia passo-a-passo para configuracao de correio e caixa postal no WHM/cPanel. Publico: analista. Retorna tutorial IMAP/SMTP com portas e configuracoes do WHM.',
     arguments: [
       {
         name: 'email_address',
-        description: 'Endereço de email para configurar',
+        description: 'Endereco de email para configurar (ex: user@dominio.com). Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_ssl_installation_guide',
-    description: 'Guia de instalação de certificado SSL',
+    description: 'Guia de instalacao de certificado SSL e seguranca HTTPS no WHM/cPanel. Publico: analista. Retorna tutorial de AutoSSL e instalacao manual no servidor WHM.',
     arguments: [
       {
         name: 'domain',
-        description: 'Domínio para instalar SSL',
+        description: 'Dominio para instalar certificado SSL. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_website_down_investigation',
-    description: 'Investigação de site fora do ar com diagnóstico completo',
+    description: 'Investigacao de site fora do ar no WHM/cPanel com diagnostico completo de conectividade, DNS e servicos. Publico: analista. Retorna runbook de troubleshooting do WHM.',
     arguments: [
       {
         name: 'domain',
-        description: 'Domínio do site fora do ar',
+        description: 'Dominio do site fora do ar para investigacao. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_disk_usage_alert',
-    description: 'Alerta de uso de disco com análise de consumo por conta',
+    description: 'Alerta de uso de disco e armazenamento no WHM/cPanel com analise de consumo por conta e diretorios. Publico: analista. Retorna recomendacoes de limpeza no WHM.',
     arguments: [
       {
         name: 'account_name',
-        description: 'Nome da conta para análise específica',
+        description: 'Nome da conta cPanel para analise de disco. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_domain_migration_checklist',
-    description: 'Checklist completo para migração de domínio',
+    description: 'Checklist completo para migracao de dominio e hospedagem entre servidores WHM/cPanel. Publico: analista. Retorna guia de transferencia com validacoes do WHM.',
     arguments: [
       {
         name: 'domain_from',
-        description: 'Domínio origem',
+        description: 'Dominio de origem da migracao. Obrigatorio.',
         required: true
       },
       {
         name: 'domain_to',
-        description: 'Domínio destino (novo servidor)',
+        description: 'Dominio de destino no novo servidor. Obrigatorio.',
         required: true
       }
     ]
   },
   {
     name: 'whm_backup_restore_guide',
-    description: 'Guia de restauração de backup',
+    description: 'Guia de restauracao de backup e copias de seguranca no WHM/cPanel. Publico: analista. Retorna runbook com metodos de restore e troubleshooting do WHM.',
     arguments: [
       {
         name: 'account_name',
-        description: 'Nome da conta a restaurar',
+        description: 'Nome da conta cPanel a restaurar. Obrigatorio.',
         required: true
       },
       {
         name: 'backup_date',
-        description: 'Data do backup (formato YYYY-MM-DD)',
+        description: 'Data do backup no formato YYYY-MM-DD. Opcional, padrao: mais recente.',
         required: false
       }
     ]
