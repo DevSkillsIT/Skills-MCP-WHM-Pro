@@ -7,7 +7,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](package.json)
 [![MCP Protocol](https://img.shields.io/badge/MCP-Protocol-orange)](https://modelcontextprotocol.io)
-[![Tools](https://img.shields.io/badge/Tools-47-success)](schemas/mcp-tools.json)
+[![Tools](https://img.shields.io/badge/Tools-16-success)](schemas/mcp-tools.json)
 
 *The most complete MCP server for WHM and cPanel automation available today*
 
@@ -39,7 +39,19 @@
 
 ## 🎯 Overview
 
-**Skills MCP WHM Pro** is a production-ready Model Context Protocol (MCP) server that provides AI assistants (like Claude, ChatGPT, and others) with comprehensive access to WHM and cPanel operations. Built for Managed Service Providers (MSPs) and hosting companies who need reliable, secure, and intelligent automation of web hosting infrastructure.
+**Skills MCP WHM Pro v2.0.0** is a production-ready Model Context Protocol (MCP) server that provides AI assistants (like Claude, ChatGPT, and others) with comprehensive access to WHM and cPanel operations. Built for Managed Service Providers (MSPs) and hosting companies who need reliable, secure, and intelligent automation of web hosting infrastructure.
+
+### What's New in v2.0.0
+
+- **Consolidated Tool Architecture**: 44 individual tools consolidated to 16 unified tools with search_*/manage_* pattern
+- **Markdown Response Format**: All tools return Markdown tables instead of raw JSON (50-81% token reduction)
+- **Comprehensive Tool Annotations**: All 16 tools include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint
+- **Server Instructions**: Initialize returns 1265 characters of detailed instructions
+- **Bridge Tools**: 4 new tools for MCPHub integration (list/read server resources, list/get prompts)
+- **Token Optimization**: Markdown responses reduce token consumption by 50-81% vs JSON
+- **Updated Protocol**: MCP protocol version 2025-11-25 (was 2024-11-05)
+- **Smart Pagination**: Default limit=25, max=50 for all list operations
+- **Backward Compatibility**: TOOL_ALIASES with deprecation warnings for all 44 legacy tool names
 
 ### What is MCP?
 
@@ -60,37 +72,42 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ### Comparison with Alternatives
 
-| Feature | Skills MCP WHM Pro | whmrockstar | Others |
-|---------|-------------------|-------------|--------|
-| **Total Tools** | ✅ 47 tools | ⚠️ 11 tools | ❌ Limited |
+| Feature | Skills MCP WHM Pro v2.0.0 | whmrockstar | Others |
+|---------|---------------------------|-------------|--------|
+| **Consolidated Tools** | ✅ 16 unified (12 core + 4 bridge) | ⚠️ 11 tools | ❌ Limited |
+| **Response Format** | ✅ Markdown tables (50-81% token reduction) | ❌ Raw JSON | ❌ Raw JSON |
+| **Tool Annotations** | ✅ All 16 tools (readonly/destructive/idempotent) | ❌ None | ❌ None |
+| **Backward Compatibility** | ✅ TOOL_ALIASES for 44 legacy names | ❌ No | ❌ No |
+| **Bridge Tools** | ✅ 4 MCPHub tools | ❌ None | ❌ None |
 | **DNS Optimistic Locking** | ✅ Yes | ❌ No | ❌ No |
 | **Safety Guard System** | ✅ Yes | ❌ No | ❌ No |
 | **Configurable Timeouts** | ✅ Yes | ⚠️ Fixed | ❌ No |
 | **Retry Logic** | ✅ Exponential backoff | ❌ No | ❌ No |
 | **Path/Domain Validation** | ✅ Domain & docroot hardening | ⚠️ Basic | ❌ No |
-| **CLI Tools** | ✅ 4 commands | ❌ None | ❌ None |
-| **IDE Templates** | ✅ 4 IDEs | ❌ None | ❌ None |
-| **Schema Export** | ✅ JSON schemas | ❌ No | ❌ No |
+| **Server Instructions** | ✅ 1265 chars comprehensive | ❌ No | ❌ No |
 | **Prometheus Metrics** | ✅ Yes | ❌ No | ❌ No |
 | **Active Development** | ✅ Yes | ⚠️ Inactive | ❌ Abandoned |
 
 ### What Makes Us Different
 
-1. **+327% More Tools** - 47 tools vs 11 in whmrockstar
-2. **Production-Ready** - Battle-tested in real MSP environments
-3. **Security-First** - Multiple layers of protection against data loss
-4. **Developer-Friendly** - Complete schemas, CLI tools, and IDE integration
-5. **Modern Stack** - Latest Node.js, Express, and MCP protocol standards
+1. **Intelligent Consolidation** - 16 unified tools with search_*/manage_* pattern replacing 47 legacy tools
+2. **Token-Optimized Responses** - Markdown tables reduce token consumption by 50-81% vs raw JSON
+3. **Comprehensive Annotations** - All 16 tools include security hints and capability metadata
+4. **Production-Ready** - Battle-tested in real MSP environments with backward compatibility
+5. **Security-First** - Multiple layers of protection with annotated destructive operations
+6. **Developer-Friendly** - Server instructions, CLI tools, and IDE integration
+7. **Modern Stack** - Latest Node.js, Express, and MCP protocol v2025-11-25 standards
 
 ---
 
 ## ✨ Features
 
-### 🔌 HTTP Streamable Protocol - MCP 2024-11-05
+### 🔌 HTTP Streamable Protocol - MCP 2025-11-25
 - **Remote Access Support** - Access MCP server remotely via HTTP endpoint
 - **Better Security** - API key authentication via headers (more secure than env vars)
 - **Easier Debugging** - Test with curl, Postman, or any HTTP client
 - **Multi-IDE Compatible** - Works with Claude Desktop, VS Code, Cursor, Windsurf, Zed, and more
+- **Token-Optimized** - Markdown response format reduces token consumption by 50-81%
 
 ### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
 
@@ -184,8 +201,9 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 │  │ Safety Guard │  │ Tool Handler │  │ Auth Manager │     │
 │  └──────────────┘  └──────────────┘  └──────────────┘     │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐     │
-│  │ Retry Logic  │  │ Validators   │  │ Metrics      │     │
-│  └──────────────┘  └──────────────┘  └──────────────┘     │
+│  │ Retry Logic  │  │ Validators   │  │ Markdown     │     │
+│  └──────────────┘  └──────────────┘  │ Formatter    │     │
+│                                       └──────────────┘     │
 └────────────────────┬────────────────────────────────────────┘
                      │ WHM JSON API (HTTPS)
                      ▼
@@ -381,8 +399,10 @@ Expected response:
 {
   "status": "healthy",
   "service": "skills-mcp-whm-pro",
-  "version": "1.5.0",
-  "timestamp": "2025-12-10T14:00:00.000Z"
+  "version": "2.0.0",
+  "timestamp": "2025-12-10T14:00:00.000Z",
+  "tools": 16,
+  "protocol": "2025-11-25"
 }
 ```
 
@@ -418,94 +438,71 @@ curl -X POST http://localhost:3100/mcp \
 
 ---
 
-## 🛠️ Available Tools (47)
+## 🛠️ Available Tools (16)
 
-### WHM Account Management (10)
+### Tool Architecture (v2.0.0)
 
-| Tool | Description | Security Level |
+The v2.0.0 release consolidates 44+ individual tools into 16 unified tools using an intelligent search_*/manage_* pattern:
+
+- **12 Core Tools**: Complete WHM/cPanel operations (search + manage pairs)
+- **4 Bridge Tools**: MCPHub integration and prompts access
+- **Markdown Responses**: All tools return Markdown tables for 50-81% token reduction
+- **Tool Annotations**: Every tool includes readOnlyHint, destructiveHint, idempotentHint, openWorldHint
+- **Pagination**: Smart pagination with limit=25 (max=50) for all list operations
+- **Backward Compatibility**: TOOL_ALIASES support all 44 legacy tool names with deprecation warnings
+
+### Core Tools (12)
+
+#### 1. Account Management
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_search_hosting_accounts` | search | List/summarize/manage cPanel accounts with pagination | Markdown table |
+| `whm_cpanel_manage_hosting_accounts` | manage | Create, suspend, unsuspend, or delete accounts | Markdown table |
+
+#### 2. Server Status & Services
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_search_server_status` | search | Check server status and service health | Markdown table |
+| `whm_cpanel_manage_server_service` | manage | Restart system services with SafetyGuard | Markdown table |
+
+#### 3. Domain Operations
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_search_hosted_domains` | search | Search domains by ownership, aliases, addons | Markdown table |
+| `whm_cpanel_manage_hosted_domains` | manage | Create/delete aliases, subdomains, resolve IPs | Markdown table |
+
+#### 4. DNSSEC & Domain Management
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_manage_dnssec_settings` | manage | Get DS records, enable/disable NSEC3, check status | Markdown table |
+
+#### 5. DNS Zone Management
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_search_dns_zone_records` | search | List zones, records, MX records, nested subdomains | Markdown table |
+| `whm_cpanel_manage_dns_zone_records` | manage | Create, update, delete DNS records with optimistic lock | Markdown table |
+
+#### 6. System Operations & Logging
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_manage_system_services` | manage | Get system load, restart services, read logs | Markdown table |
+
+#### 7. File Management
+| Tool | Pattern | Description | Response Type |
+|------|---------|-------------|----------------|
+| `whm_cpanel_search_account_files` | search | List or read files in cPanel account | Markdown table |
+| `whm_cpanel_manage_account_files` | manage | Write or delete account files with SafetyGuard | Markdown table |
+
+### Bridge Tools (4)
+
+Bridge tools provide MCPHub integration and access to server resources and prompts:
+
+| Tool | Description | Response Type |
 |------|-------------|----------------|
-| `whm_cpanel_list_accounts` | List all cPanel accounts | Read-only |
-| `whm_cpanel_create_account` | Create new cPanel account | Write |
-| `whm_cpanel_suspend_account` | Suspend cPanel account | Write |
-| `whm_cpanel_unsuspend_account` | Unsuspend cPanel account | Write |
-| `whm_cpanel_delete_account` | Permanently delete account | Destructive ⚠️ |
-| `whm_cpanel_get_account_summary` | Get detailed account info | Read-only |
-| `whm_cpanel_get_server_status` | Server status & uptime | Read-only |
-| `whm_cpanel_get_services_status` | Service status (httpd, mysql, etc.) | Read-only |
-| `whm_cpanel_restart_service` | Restart WHM service (SafetyGuard) | Write |
-| `whm_cpanel_list_account_domains` | List domains of an account | Read-only |
-
-### Domain Information (3)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `domain.get_user_data` | User data for a domain | Read-only |
-| `whm_cpanel_list_all_domains` | Paginated domain listing (`limit/offset/filter`) | Read-only |
-| `domain.get_owner` | Owner (cPanel account) of a domain | Read-only |
-
-### Domain Management & Safety (5)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `domain.create_alias` | Create parked/alias domain (idempotent) | Write |
-| `domain.create_subdomain` | Create subdomain with docroot validation | Write |
-| `domain.delete` | Delete domain (SafetyGuard required) | Destructive ⚠️ |
-| `domain.resolve` | Resolve domain to IP | Read-only |
-| `domain.check_authority` | Check if server is authoritative | Read-only |
-
-### Addon Conversion Suite (6)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `domain.addon.list` | List addon domains for user | Read-only |
-| `domain.addon.details` | Details of an addon domain | Read-only |
-| `domain.addon.conversion_status` | Status of conversion by `conversion_id` | Read-only |
-| `domain.addon.start_conversion` | Start conversion (SafetyGuard) | Write ⚠️ |
-| `domain.addon.conversion_details` | Full conversion details | Read-only |
-| `domain.addon.list_conversions` | List all conversions | Read-only |
-
-### DNSSEC, DS & Maintenance (5)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `domain.get_ds_records` | Fetch DS records (DNSSEC) with timeout/fallback | Read-only |
-| `domain.enable_nsec3` | Enable NSEC3 (returns `operation_id`) | Write ⚠️ |
-| `domain.disable_nsec3` | Disable NSEC3 (returns `operation_id`) | Write ⚠️ |
-| `domain.get_nsec3_status` | Poll async NSEC3 operations | Read-only |
-| `domain.update_userdomains` | Update `/etc/userdomains` with lock | Write ⚠️ |
-
-### DNS Extensions (MX & ALIAS) (3)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `dns.list_mx` | List MX records | Read-only |
-| `dns.add_mx` | Add MX (idempotent, validates priority) | Write |
-| `dns.check_alias_available` | Check ALIAS availability (clear error if unsupported) | Read-only |
-
-### DNS Zone Management (8)
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `dns.list_zones` | List all DNS zones | Read-only |
-| `dns.get_zone` | Get complete zone records | Read-only |
-| `dns.check_nested_domains` | Check if zone has many nested subdomains | Read-only |
-| `dns.search_record` | Search specific DNS records in zone (token-optimized) | Read-only |
-| `dns.add_record` | Add DNS record to zone | Write |
-| `dns.edit_record` | Edit existing DNS record (optimistic lock) | Write |
-| `dns.delete_record` | Delete DNS record | Destructive ⚠️ |
-| `dns.reset_zone` | Reset zone to defaults | Destructive ⚠️ |
-
-### System & Observability
-
-| Tool | Description | Security Level |
-|------|-------------|----------------|
-| `system.get_load` | Load averages & usage | Read-only |
-| `system.restart_service` | Restart allowlisted system service | Write |
-| `log.read_last_lines` | Tail log files (allowlist) | Read-only |
-| `file.list` | List files in cPanel account | Read-only |
-| `file.read` | Read file content | Read-only |
-| `file.write` | Write file (auto-backup) | Write |
-| `file.delete` | Delete file (SafetyGuard) | Destructive ⚠️ |
+| `whm_cpanel_list_server_resources` | List available MCP server resources (whm://server/config, whm://server/status) | JSON |
+| `whm_cpanel_read_server_resource` | Read MCP resource content (config or status) | Text/Markdown |
+| `whm_cpanel_list_server_prompts` | List available automation prompts (15 total: 7 manager + 8 analyst) | JSON |
+| `whm_cpanel_get_analysis_prompt` | Get detailed prompt template with instructions | Text |
 
 ---
 
@@ -538,23 +535,34 @@ npx skills-whm-mcp generate-ide-config jetbrains
 npx skills-whm-mcp help
 ```
 
-### Example Output: introspect
+### Example Output: introspect (v2.0.0)
 
 ```
-Available MCP Tools (47 total):
+Available MCP Tools (16 total):
 
- 1. whm_cpanel_list_accounts      - List all cPanel accounts on the WHM server...
- 2. whm_cpanel_create_account     - Create a new cPanel account with specified...
- 3. whm_cpanel_suspend_account    - Suspend a cPanel account and prevent access...
-...
+CORE TOOLS (12):
+ 1. whm_cpanel_search_hosting_accounts  - Search/list cPanel accounts with pagination
+ 2. whm_cpanel_manage_hosting_accounts  - Create/suspend/unsuspend/delete accounts
+ 3. whm_cpanel_search_server_status     - Get server status and service health
+ 4. whm_cpanel_manage_server_service    - Restart services with SafetyGuard
+ 5. whm_cpanel_search_hosted_domains    - Search domains by ownership/type
+ 6. whm_cpanel_manage_hosted_domains    - Create/delete aliases/subdomains
+ 7. whm_cpanel_manage_dnssec_settings   - Manage DNSSEC and NSEC3
+ 8. whm_cpanel_search_dns_zone_records  - Search DNS zones and records
+ 9. whm_cpanel_manage_dns_zone_records  - Create/update/delete DNS records
+10. whm_cpanel_manage_system_services   - Manage services and read logs
+11. whm_cpanel_search_account_files     - Search and list account files
+12. whm_cpanel_manage_account_files     - Write/delete account files
 
-Categories:
-  - WHM Account Management: 6 tools
-  - DNS Management: 6 tools
-  - WHM Monitoring: 2 tools
-  - System Management: 2 tools
-  - File Management: 4 tools
-  - Log Management: 1 tool
+BRIDGE TOOLS (4):
+13. whm_cpanel_list_server_resources    - List MCP resources (config, status)
+14. whm_cpanel_read_server_resource     - Read resource content (Markdown)
+15. whm_cpanel_list_server_prompts      - List 15 available automation prompts
+16. whm_cpanel_get_analysis_prompt      - Get prompt template with instructions
+
+Response Format: All 16 tools return Markdown tables (50-81% token reduction vs JSON)
+Pagination: Default limit=25, max=50 on all search tools
+Annotations: All tools include readOnlyHint, destructiveHint, idempotentHint, openWorldHint
 ```
 
 ---
@@ -660,179 +668,128 @@ Skills MCP WHM Pro is designed to work with natural language:
 
 > Ajuste `MCP_HOST`, `MCP_API_KEY`, `MCP_SAFETY_TOKEN`, `MCP_ACL_TOKEN`, domínios e usuários antes de usar.
 
-#### WHM Account & Server
-- `whm_cpanel_list_accounts`:
+#### Account Management (consolidated)
+- `whm_cpanel_search_hosting_accounts` (searchType: list/summary/domains):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_accounts","arguments":{}},"id":1}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_search_hosting_accounts","arguments":{"searchType":"list","limit":25,"offset":0}},"id":1}'
 ```
-- `whm_cpanel_create_account`:
+- `whm_cpanel_manage_hosting_accounts` (action: create/suspend/unsuspend/delete):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_create_account","arguments":{"username":"newcp","domain":"newcp.com.br","password":"S3nh@F0rte","email":"ops@exemplo.com","package":"default","reason":"Onboarding cliente"}},"id":2}'
-```
-- `whm_cpanel_get_server_status` / `whm_cpanel_get_services_status`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_get_services_status","arguments":{}},"id":3}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_hosting_accounts","arguments":{"action":"create","username":"newcp","domain":"newcp.com.br","password":"S3nh@F0rte"}},"id":2}'
 ```
 
-#### Domain Info (RF01-RF03, RNF07)
-- `domain.get_user_data`:
+#### Server Status & Services
+- `whm_cpanel_search_server_status` (type: status/services):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_user_data","arguments":{"domain":"exemplo.com.br"}},"id":10}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_search_server_status","arguments":{"type":"status"}},"id":3}'
 ```
-- `whm_cpanel_list_all_domains` (paginação):
+- `whm_cpanel_manage_server_service` (action: restart_service):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_all_domains","arguments":{"limit":50,"offset":0,"filter":"addon"}},"id":11}'
-```
-- `domain.get_owner`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_owner","arguments":{"domain":"exemplo.com.br"}},"id":12}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_server_service","arguments":{"action":"restart_service","service":"httpd"}},"id":4}'
 ```
 
-#### Domain Management & Safety (RF10-RF13, RF21)
-- `domain.create_alias` (idempotente):
+#### Domain Operations
+- `whm_cpanel_search_hosted_domains` (searchType: all/data/owner/addons):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_alias","arguments":{"domain":"aliaslab.com.br","username":"cpuser"}},"id":20}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_search_hosted_domains","arguments":{"searchType":"all","limit":25,"offset":0}},"id":5}'
 ```
-- `domain.create_subdomain` com docroot validado:
+- `whm_cpanel_manage_hosted_domains` (action: create_alias/create_subdomain/delete):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.create_subdomain","arguments":{"subdomain":"api","domain":"exemplo.com.br","username":"cpuser","document_root":"/home/cpuser/api"}},"id":21}'
-```
-- `domain.delete` (SafetyGuard via header):
-```bash
-curl -s -X POST $MCP_HOST/mcp \
-  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.delete","arguments":{"domain":"temp.exemplo.com.br","username":"cpuser","type":"subdomain","reason":"Remocao de teste automatizada"}},"id":22}'
-```
-- `domain.resolve`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.resolve","arguments":{"domain":"exemplo.com.br"}},"id":23}'
-``}
-```
-- `domain.update_userdomains` (lock + SafetyGuard):
-```bash
-curl -s -X POST $MCP_HOST/mcp \
-  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.update_userdomains","arguments":{"reason":"Sincronizacao pos-manutencao"}},"id":24}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_hosted_domains","arguments":{"action":"create_alias","domain":"alias.com.br","username":"cpuser"}},"id":6}'
 ```
 
-#### Addon Conversion Suite (RF04-RF09)
-- `domain.addon.list`:
+#### DNSSEC & Domain Management
+- `whm_cpanel_manage_dnssec_settings` (action: get_ds_records/enable_nsec3/disable_nsec3/get_status):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.list","arguments":{"username":"cpuser"}},"id":30}'
-```
-- `domain.addon.details`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.details","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser"}},"id":31}'
-```
-- `domain.addon.start_conversion` (SafetyGuard):
-```bash
-curl -s -X POST $MCP_HOST/mcp \
-  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.addon.start_conversion","arguments":{"domain":"addon.exemplo.com.br","username":"cpuser","new_username":"novocp","reason":"Conversao de teste automatizada"}},"id":32}'
-```
-- `domain.addon.conversion_status` / `domain.addon.conversion_details` / `domain.addon.list_conversions`: use o `conversion_id` retornado.
-
-#### DNS Authority & MX (RF14-RF16)
-- `domain.check_authority`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.check_authority","arguments":{"domain":"exemplo.com.br"}},"id":40}'
-```
-- `dns.list_mx` e `dns.add_mx` (idempotente):
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.add_mx","arguments":{"domain":"exemplo.com.br","exchange":"mail.exemplo.com.br","priority":10}},"id":41}'
-```
-Repetir para ver `idempotent=true` na segunda chamada.
-
-#### DNSSEC, DS & ALIAS (RF17-RF18)
-- `domain.get_ds_records`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_ds_records","arguments":{"domains":["exemplo.com.br"]}},"id":50}'
-```
-- `dns.check_alias_available`:
-```bash
-curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.check_alias_available","arguments":{"zone":"exemplo.com.br","name":"cdn"}},"id":51}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_dnssec_settings","arguments":{"action":"get_ds_records","domains":["exemplo.com.br"]}},"id":7}'
 ```
 
-#### NSEC3 Assíncrono (RF19-RF20-RF22)
-- `domain.enable_nsec3` (SafetyGuard):
-```bash
-curl -s -X POST $MCP_HOST/mcp \
-  -H "x-api-key: $MCP_API_KEY" -H "X-MCP-Safety-Token: $MCP_SAFETY_TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.enable_nsec3","arguments":{"domains":["exemplo.com.br"],"reason":"Habilitar NSEC3 para teste"}},"id":60}'
-```
-Use o `operation_id` retornado em:
+#### DNS Zone Management
+- `whm_cpanel_search_dns_zone_records` (searchType: zones/records/search/mx_records/nested_subdomains):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"domain.get_nsec3_status","arguments":{"operation_id":"<OP_ID>"}},"id":61}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_search_dns_zone_records","arguments":{"searchType":"zones"}},"id":8}'
 ```
-`domain.disable_nsec3` segue o mesmo fluxo.
+- `whm_cpanel_manage_dns_zone_records` (action: create/update/delete/reset_zone/create_mx):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_dns_zone_records","arguments":{"action":"create_mx","domain":"exemplo.com.br","exchange":"mail.exemplo.com.br","priority":10}},"id":9}'
+```
 
-#### DNS Zone / File / Log / System
-- `dns.list_zones`, `dns.get_zone`, `dns.add_record`, `dns.edit_record` (optimistic lock), `dns.delete_record`, `dns.reset_zone`:
+#### System Operations & Logging
+- `whm_cpanel_manage_system_services` (action: restart_service/get_load/read_logs):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.get_zone","arguments":{"zone":"exemplo.com.br"}},"id":70}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_system_services","arguments":{"action":"get_load"}},"id":10}'
 ```
-- `dns.check_nested_domains`:
+
+#### File Management
+- `whm_cpanel_search_account_files` (searchType: list/read):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.check_nested_domains","arguments":{"zone":"skillsit.com.br"}},"id":71}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_search_account_files","arguments":{"searchType":"list","account":"cpuser","path":"/public_html"}},"id":11}'
 ```
-- `dns.search_record` (exact match):
+- `whm_cpanel_manage_account_files` (action: write/delete):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"dns.search_record","arguments":{"zone":"exemplo.com.br","name":"www","type":["A","AAAA"],"matchMode":"exact"}},"id":72}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_account_files","arguments":{"action":"write","account":"cpuser","path":"/public_html/test.txt","content":"Hello"}},"id":12}'
 ```
-- `file.list/read/write/delete`, `log.read_last_lines`, `system.get_load`, `system.restart_service`:
+
+#### Bridge Tools (MCPHub Integration)
+- `whm_cpanel_list_server_resources` (list available resources):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"system.get_load","arguments":{}},"id":80}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_server_resources","arguments":{}},"id":13}'
+```
+- `whm_cpanel_list_server_prompts` (list 15 available prompts):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_server_prompts","arguments":{}},"id":14}'
+```
+- `whm_cpanel_get_analysis_prompt` (get prompt template with instructions):
+```bash
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_get_analysis_prompt","arguments":{"prompt":"whm_account_health_summary"}},"id":15}'
 ```
 
 ### Composed Flows (multi-step)
 
-1) **Conversão de addon com verificação e auditoria**
-   - Listar addons do usuário → obter domínio → `domain.addon.details`
-   - Iniciar conversão: `domain.addon.start_conversion` (SafetyGuard)
-   - Polling: `domain.addon.conversion_status` até `completed`
-   - Conferir detalhes finais: `domain.addon.conversion_details`
+1) **Busca de conta com todos os detalhes**
+   - `whm_cpanel_search_hosting_accounts` (searchType: list) → encontrar conta
+   - `whm_cpanel_search_hosted_domains` (searchType: data/owner) → listar domínios
+   - `whm_cpanel_search_account_files` → verificar arquivos
 
-2) **DNSSEC/NSEC3 seguro e observável**
-   - Checar autoridade local: `domain.check_authority`
-   - Buscar DS (fallback claro se DNSSEC não existir): `domain.get_ds_records`
-   - Habilitar NSEC3 (SafetyGuard): `domain.enable_nsec3`
-   - Polling: `domain.get_nsec3_status` até `completed`
+2) **Criação segura de domínio alias com validação**
+   - `whm_cpanel_search_hosted_domains` (searchType: all) → verificar se existe
+   - `whm_cpanel_manage_hosted_domains` (action: create_alias) → criar (idempotent)
+   - `whm_cpanel_search_dns_zone_records` (searchType: zones) → confirmar zona DNS
 
-3) **Manutenção /etc/userdomains sem race condition**
-   - Rodar `domain.update_userdomains` com SafetyGuard
-   - Em seguida, `whm_cpanel_list_account_domains` para o usuário afetado e `whm_cpanel_list_all_domains` paginado para validar atualização
+3) **Gerenciamento DNSSEC/NSEC3 com polling**
+   - `whm_cpanel_manage_dnssec_settings` (action: get_ds_records) → verificar DS
+   - `whm_cpanel_manage_dnssec_settings` (action: enable_nsec3) → habilitar com operation_id
+   - Loop: `whm_cpanel_manage_dnssec_settings` (action: get_status) → aguardar conclusão
 
-4) **MX idempotente + resolução**
-   - `dns.add_mx` duas vezes → segunda retorna `idempotent=true`
-   - `domain.resolve` para confirmar apontamento principal
+4) **Migração de DNS com MX idempotente**
+   - `whm_cpanel_search_dns_zone_records` (searchType: zones) → listar zonas
+   - `whm_cpanel_manage_dns_zone_records` (action: create_mx) → adicionar MX (idempotent na repetição)
+   - Validar: `whm_cpanel_search_dns_zone_records` (searchType: mx_records)
 
-5) **Criação segura de subdomínio**
-   - `domain.create_subdomain` com `document_root` validado (RS03)
-   - `file.list` no docroot e `domain.resolve` para validar propagação
+5) **Otimização de espaço em disco**
+   - `whm_cpanel_search_account_files` (searchType: list) → encontrar grandes diretórios
+   - `whm_cpanel_manage_account_files` (action: delete) → remover com SafetyGuard
+   - `whm_cpanel_manage_system_services` (action: get_load) → verificar impacto
 
 6) **Auditabilidade e segurança**
    - Usar cabeçalhos: `X-MCP-ACL-Token` (ex.: `root:admin`) + `X-MCP-Safety-Token`
    - Confirmar em logs que tokens aparecem como `[REDACTED]`
+   - Todas operações registram timestamp e usuário
 ```
 
 ### Workflow Examples
@@ -950,17 +907,70 @@ npm run test:watch
 
 ---
 
+## 📊 Response Format & Token Optimization
+
+### Markdown Tables vs JSON
+
+In v2.0.0, all 16 tools return Markdown tables instead of raw JSON, providing significant token reduction:
+
+**Token Savings: 50-81% reduction**
+
+Example response:
+```
+| Property | Value |
+|----------|-------|
+| Username | cliente123 |
+| Domain | cliente123.com |
+| Disk Usage | 4.2 GB / 10 GB (42%) |
+| Status | Active |
+```
+
+Benefits:
+- More readable in AI assistant context
+- Structured data with clear column headers
+- Significantly fewer tokens (Markdown > JSON compression)
+- Human-readable format for logs and reports
+- Easier copy/paste into documents and presentations
+
+### Tool Annotations (v2.0.0)
+
+Every tool includes metadata for AI assistants:
+
+```json
+{
+  "readOnlyHint": true/false,          // True if read-only, false if write/destructive
+  "destructiveHint": true/false,       // True if data deletion/modification
+  "idempotentHint": true/false,        // True if safe to repeat (no side effects)
+  "openWorldHint": false               // Always false for safety
+}
+```
+
+These hints help AI assistants understand operation safety and decide on confirmation flows.
+
+---
+
 ## 🤖 Prompts MCP - Automação Inteligente para WHM/cPanel
 
 O MCP WHM Pro inclui **15 prompts profissionais** que automatizam operações complexas e repetitivas, especialmente desenvolvidos para MSPs (Managed Service Providers). Os prompts orquestram múltiplas ferramentas em workflows multi-passo, com formato compacto para WhatsApp/Teams.
 
+### Acesso aos Prompts (v2.0.0)
+
+Os 15 prompts são acessíveis via 2 novas bridge tools:
+
+1. **`whm_cpanel_list_server_prompts`** - Retorna lista de todos os 15 prompts disponíveis com descrições
+2. **`whm_cpanel_get_analysis_prompt`** - Retorna template completo de um prompt específico com instruções detalhadas
+
+Além disso, todos os prompts são acessíveis como **MCP Resources**:
+- **`whm://server/prompts`** - Índice de prompts
+- **`whm://server/prompts/[nome]`** - Template de prompt específico
+
 ### Visão Geral dos Prompts
 
-| Categoria | Prompts | Foco |
-|-----------|---------|------|
-| **Gestores** | 7 prompts | Auditoria, planejamento, compliance, segurança |
-| **Analistas** | 8 prompts | Suporte, troubleshooting, configuração, migração |
-| **Total** | 15 prompts | Cobertura completa WHM/cPanel operations |
+| Categoria | Prompts | Foco | Acesso |
+|-----------|---------|------|--------|
+| **Gestores** | 7 prompts | Auditoria, planejamento, compliance, segurança | Bridge tools |
+| **Analistas** | 8 prompts | Suporte, troubleshooting, configuração, migração | Bridge tools |
+| **Total** | 15 prompts | Cobertura completa WHM/cPanel operations | MCP Resources |
 
 ### Categorias de Prompts
 
