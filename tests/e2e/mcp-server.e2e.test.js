@@ -121,20 +121,7 @@ describe('E2E: Tool Execution', () => {
     expect(text).toContain('Status');
   });
 
-  (serverAvailable ? test : test.skip)('E2E-08: Alias backward compat funciona', async () => {
-    const res = await mcpCall('tools/call', {
-      name: 'whm_cpanel_list_accounts',
-      arguments: {}
-    });
-    // Deve funcionar via alias (redireciona para search_accounts)
-    expect(res.result || res.error).toBeDefined();
-    // Se result, deve conter Markdown
-    if (res.result?.content?.[0]?.text) {
-      expect(res.result.content[0].text).toContain('|');
-    }
-  });
-
-  (serverAvailable ? test : test.skip)('E2E-09: manage_accounts delete sem token retorna erro', async () => {
+  (serverAvailable ? test : test.skip)('E2E-08: manage_accounts delete sem token retorna erro', async () => {
     const res = await mcpCall('tools/call', {
       name: 'whm_cpanel_manage_hosting_accounts',
       arguments: { action: 'delete', username: 'nonexistent_test_user' }
@@ -144,7 +131,7 @@ describe('E2E: Tool Execution', () => {
     expect(text.toLowerCase()).toMatch(/confirm|token|required/i);
   });
 
-  (serverAvailable ? test : test.skip)('E2E-10: bridge list_prompts retorna lista', async () => {
+  (serverAvailable ? test : test.skip)('E2E-09: list_prompts retorna lista', async () => {
     const res = await mcpCall('tools/call', {
       name: 'whm_cpanel_list_server_prompts',
       arguments: {}

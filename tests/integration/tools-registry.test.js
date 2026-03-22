@@ -6,7 +6,7 @@ const MCPHandler = require('../../src/mcp-handler');
 const { toolDefinitions } = MCPHandler;
 
 describe('AC-03: Tool count = 16', () => {
-  test('total de 16 tools (12 core + 4 bridge)', () => {
+  test('total de 16 tools (12 core + 4 utility)', () => {
     expect(toolDefinitions.length).toBe(16);
   });
 
@@ -17,11 +17,11 @@ describe('AC-03: Tool count = 16', () => {
     expect(core.length).toBe(12);
   });
 
-  test('4 bridge tools', () => {
-    const bridge = toolDefinitions.filter(t =>
+  test('4 tools utilitarias', () => {
+    const utility = toolDefinitions.filter(t =>
       ['whm_cpanel_list_server_resources', 'whm_cpanel_read_server_resource', 'whm_cpanel_list_server_prompts', 'whm_cpanel_get_analysis_prompt'].includes(t.name)
     );
-    expect(bridge.length).toBe(4);
+    expect(utility.length).toBe(4);
   });
 });
 
@@ -60,7 +60,7 @@ describe('AC-05: Annotations completas', () => {
     });
   });
 
-  test('bridge tools list_resources e list_prompts sao locais (openWorldHint=false)', () => {
+  test('tools utilitarias list_resources e list_prompts sao locais (openWorldHint=false)', () => {
     ['whm_cpanel_list_server_resources', 'whm_cpanel_list_server_prompts'].forEach(name => {
       const tool = toolDefinitions.find(t => t.name === name);
       expect(tool.annotations.openWorldHint).toBe(false);
@@ -128,17 +128,15 @@ describe('F11: Protocol version', () => {
   });
 });
 
-describe('F06: TOOL_ALIASES backward compatibility', () => {
-  test('aliases redirecionam tools antigas para consolidadas', async () => {
+describe('Tool not found retorna erro claro', () => {
+  test('tool inexistente retorna Tool not found', async () => {
     const handler = new MCPHandler();
-    // Chamar tool antiga deve resolver para a nova (mas falhar pois whmService=null)
     const result = await handler.handleRequest({
       jsonrpc: '2.0', method: 'tools/call', id: 1,
-      params: { name: 'whm_cpanel_list_accounts', arguments: {} }
+      params: { name: 'whm_cpanel_nonexistent_tool', arguments: {} }
     });
-    // Deve ter tentado executar (e falhar com WHM service not configured, nao tool not found)
-    const text = result.result?.content?.[0]?.text || result.error?.message || '';
-    expect(text).not.toContain('Tool not found');
+    expect(result.error).toBeDefined();
+    expect(result.error.message).toContain('Tool not found');
   });
 });
 

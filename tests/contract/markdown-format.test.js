@@ -56,13 +56,13 @@ describe('AC-04a: Cenario Gherkin — busca de contas', () => {
 });
 
 describe('Bridge tools retornam strings', () => {
-  test('bridge tools passam strings direto', () => {
+  test('tools utilitarias passam strings direto', () => {
     const result = formatToolResponse('whm_cpanel_list_server_resources', 'markdown content', {});
     expect(result).toBe('markdown content');
   });
 });
 
-describe('TOOL_FORMATTERS count = 16 (12 core + 4 bridge)', () => {
+describe('TOOL_FORMATTERS count = 16 (12 core + 4 utility)', () => {
   test('exatamente 16 formatters registrados', () => {
     expect(Object.keys(TOOL_FORMATTERS).length).toBe(16);
   });
