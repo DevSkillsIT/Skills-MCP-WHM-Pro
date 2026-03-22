@@ -47,15 +47,13 @@
 - **Markdown Response Format**: All tools return Markdown tables instead of raw JSON (50-81% token reduction)
 - **Comprehensive Tool Annotations**: All 16 tools include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint
 - **Server Instructions**: Initialize returns 1265 characters of detailed instructions
-- **Bridge Tools**: 4 new tools for MCPHub integration (list/read server resources, list/get prompts)
 - **Token Optimization**: Markdown responses reduce token consumption by 50-81% vs JSON
 - **Updated Protocol**: MCP protocol version 2025-11-25 (was 2024-11-05)
 - **Smart Pagination**: Default limit=25, max=50 for all list operations
-- **Backward Compatibility**: TOOL_ALIASES with deprecation warnings for all 44 legacy tool names
 
 ### What is MCP?
 
-Model Context Protocol (MCP) is an open standard that enables AI assistants to securely interact with external systems through a unified interface. This MCP server acts as a bridge between AI models and your WHM/cPanel servers.
+Model Context Protocol (MCP) is an open standard that enables AI assistants to securely interact with external systems through a unified interface. This MCP server acts as a interface between AI models and your WHM/cPanel servers.
 
 ### Key Capabilities
 
@@ -74,11 +72,9 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 | Feature | Skills MCP WHM Pro v2.0.0 | whmrockstar | Others |
 |---------|---------------------------|-------------|--------|
-| **Consolidated Tools** | ✅ 16 unified (12 core + 4 bridge) | ⚠️ 11 tools | ❌ Limited |
+| **Consolidated Tools** | ✅ 16 unified (12 core + 4 utility) | ⚠️ 11 tools | ❌ Limited |
 | **Response Format** | ✅ Markdown tables (50-81% token reduction) | ❌ Raw JSON | ❌ Raw JSON |
 | **Tool Annotations** | ✅ All 16 tools (readonly/destructive/idempotent) | ❌ None | ❌ None |
-| **Backward Compatibility** | ✅ TOOL_ALIASES for 44 legacy names | ❌ No | ❌ No |
-| **Bridge Tools** | ✅ 4 MCPHub tools | ❌ None | ❌ None |
 | **DNS Optimistic Locking** | ✅ Yes | ❌ No | ❌ No |
 | **Safety Guard System** | ✅ Yes | ❌ No | ❌ No |
 | **Configurable Timeouts** | ✅ Yes | ⚠️ Fixed | ❌ No |
@@ -90,10 +86,8 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 ### What Makes Us Different
 
-1. **Intelligent Consolidation** - 16 unified tools with search_*/manage_* pattern replacing 47 legacy tools
 2. **Token-Optimized Responses** - Markdown tables reduce token consumption by 50-81% vs raw JSON
 3. **Comprehensive Annotations** - All 16 tools include security hints and capability metadata
-4. **Production-Ready** - Battle-tested in real MSP environments with backward compatibility
 5. **Security-First** - Multiple layers of protection with annotated destructive operations
 6. **Developer-Friendly** - Server instructions, CLI tools, and IDE integration
 7. **Modern Stack** - Latest Node.js, Express, and MCP protocol v2025-11-25 standards
@@ -445,11 +439,9 @@ curl -X POST http://localhost:3100/mcp \
 The v2.0.0 release consolidates 44+ individual tools into 16 unified tools using an intelligent search_*/manage_* pattern:
 
 - **12 Core Tools**: Complete WHM/cPanel operations (search + manage pairs)
-- **4 Bridge Tools**: MCPHub integration and prompts access
 - **Markdown Responses**: All tools return Markdown tables for 50-81% token reduction
 - **Tool Annotations**: Every tool includes readOnlyHint, destructiveHint, idempotentHint, openWorldHint
 - **Pagination**: Smart pagination with limit=25 (max=50) for all list operations
-- **Backward Compatibility**: TOOL_ALIASES support all 44 legacy tool names with deprecation warnings
 
 ### Core Tools (12)
 
@@ -493,9 +485,8 @@ The v2.0.0 release consolidates 44+ individual tools into 16 unified tools using
 | `whm_cpanel_search_account_files` | search | List or read files in cPanel account | Markdown table |
 | `whm_cpanel_manage_account_files` | manage | Write or delete account files with SafetyGuard | Markdown table |
 
-### Bridge Tools (4)
+### Utility Tools (4)
 
-Bridge tools provide MCPHub integration and access to server resources and prompts:
 
 | Tool | Description | Response Type |
 |------|-------------|----------------|
@@ -554,7 +545,7 @@ CORE TOOLS (12):
 11. whm_cpanel_search_account_files     - Search and list account files
 12. whm_cpanel_manage_account_files     - Write/delete account files
 
-BRIDGE TOOLS (4):
+UTILITY TOOLS (4):
 13. whm_cpanel_list_server_resources    - List MCP resources (config, status)
 14. whm_cpanel_read_server_resource     - Read resource content (Markdown)
 15. whm_cpanel_list_server_prompts      - List 15 available automation prompts
@@ -742,7 +733,6 @@ curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_manage_account_files","arguments":{"action":"write","account":"cpuser","path":"/public_html/test.txt","content":"Hello"}},"id":12}'
 ```
 
-#### Bridge Tools (MCPHub Integration)
 - `whm_cpanel_list_server_resources` (list available resources):
 ```bash
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
@@ -955,7 +945,7 @@ O MCP WHM Pro inclui **15 prompts profissionais** que automatizam operações co
 
 ### Acesso aos Prompts (v2.0.0)
 
-Os 15 prompts são acessíveis via 2 novas bridge tools:
+Os 15 prompts são acessíveis via 2 novas utility tools:
 
 1. **`whm_cpanel_list_server_prompts`** - Retorna lista de todos os 15 prompts disponíveis com descrições
 2. **`whm_cpanel_get_analysis_prompt`** - Retorna template completo de um prompt específico com instruções detalhadas
@@ -968,8 +958,8 @@ Além disso, todos os prompts são acessíveis como **MCP Resources**:
 
 | Categoria | Prompts | Foco | Acesso |
 |-----------|---------|------|--------|
-| **Gestores** | 7 prompts | Auditoria, planejamento, compliance, segurança | Bridge tools |
-| **Analistas** | 8 prompts | Suporte, troubleshooting, configuração, migração | Bridge tools |
+| **Gestores** | 7 prompts | Auditoria, planejamento, compliance, segurança | Utility tools |
+| **Analistas** | 8 prompts | Suporte, troubleshooting, configuração, migração | Utility tools |
 | **Total** | 15 prompts | Cobertura completa WHM/cPanel operations | MCP Resources |
 
 ### Categorias de Prompts

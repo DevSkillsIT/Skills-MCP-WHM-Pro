@@ -67,7 +67,7 @@ SERVIDOR: search_server_status (type: status/services) | manage_server_service (
 DOMINIOS: search_hosted_domains (searchType: all/data/owner/addons/addon_details/authority) | manage_hosted_domains (action: create_alias/create_subdomain/delete/resolve_ip/get_conversion_status/create_conversion/get_conversion_details/list_conversions/update_cache)
 DNS: search_dns_zone_records (searchType: zones/records/search/mx_records/nested_subdomains/alias_check) | manage_dns_zone_records (action: create/update/delete/reset_zone/create_mx) | manage_dnssec_settings (action: get_ds_records/enable_nsec3/disable_nsec3/get_status)
 SISTEMA: manage_system_services (action: restart_service/get_load/read_logs) | search_account_files (searchType: list/read) | manage_account_files (action: write/delete)
-BRIDGE: list_server_resources, read_server_resource, list_server_prompts, get_analysis_prompt
+UTILITARIOS: list_server_resources, read_server_resource (dados estaticos), list_server_prompts, get_analysis_prompt (15 relatorios)
 
 Prefixo: whm_cpanel_. search_ para leitura, manage_ para mutacao. Operacoes destrutivas requerem confirmationToken.
 
@@ -75,58 +75,7 @@ Exemplos:
 - whm_cpanel_search_hosting_accounts {searchType:"list"}
 - whm_cpanel_manage_dns_zone_records {action:"create", zone:"exemplo.com", type:"A", name:"www", address:"1.2.3.4"}`;
 
-// SPEC-WHM-ENHANCE-001 / F06 - Tool Aliases (backward compatibility)
-const TOOL_ALIASES = {
-  'whm_cpanel_list_accounts': 'whm_cpanel_search_hosting_accounts',
-  'whm_cpanel_get_account_summary': 'whm_cpanel_search_hosting_accounts',
-  'whm_cpanel_list_account_domains': 'whm_cpanel_search_hosting_accounts',
-  'whm_cpanel_create_account': 'whm_cpanel_manage_hosting_accounts',
-  'whm_cpanel_suspend_account': 'whm_cpanel_manage_hosting_accounts',
-  'whm_cpanel_unsuspend_account': 'whm_cpanel_manage_hosting_accounts',
-  'whm_cpanel_delete_account': 'whm_cpanel_manage_hosting_accounts',
-  'whm_cpanel_get_server_status': 'whm_cpanel_search_server_status',
-  'whm_cpanel_get_services_status': 'whm_cpanel_search_server_status',
-  'whm_cpanel_restart_service': 'whm_cpanel_manage_server_service',
-  'whm_cpanel_list_all_domains': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_get_domain_data': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_get_domain_owner': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_list_addon_domains': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_get_addon_domain_details': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_check_domain_authority': 'whm_cpanel_search_hosted_domains',
-  'whm_cpanel_create_domain_alias': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_create_subdomain': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_delete_domain': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_resolve_domain_ip': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_get_addon_conversion_status': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_create_addon_conversion': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_get_addon_conversion_details': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_list_addon_conversions': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_update_userdomains_cache': 'whm_cpanel_manage_hosted_domains',
-  'whm_cpanel_get_dnssec_ds_records': 'whm_cpanel_manage_dnssec_settings',
-  'whm_cpanel_enable_dnssec_nsec3': 'whm_cpanel_manage_dnssec_settings',
-  'whm_cpanel_disable_dnssec_nsec3': 'whm_cpanel_manage_dnssec_settings',
-  'whm_cpanel_get_nsec3_operation_status': 'whm_cpanel_manage_dnssec_settings',
-  'whm_cpanel_list_dns_zones': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_get_dns_zone_records': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_search_dns_record': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_list_dns_mx_records': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_check_dns_nested_subdomains': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_check_dns_alias_available': 'whm_cpanel_search_dns_zone_records',
-  'whm_cpanel_create_dns_record': 'whm_cpanel_manage_dns_zone_records',
-  'whm_cpanel_update_dns_record': 'whm_cpanel_manage_dns_zone_records',
-  'whm_cpanel_delete_dns_record': 'whm_cpanel_manage_dns_zone_records',
-  'whm_cpanel_reset_dns_zone': 'whm_cpanel_manage_dns_zone_records',
-  'whm_cpanel_create_dns_mx_record': 'whm_cpanel_manage_dns_zone_records',
-  'whm_cpanel_restart_system_service': 'whm_cpanel_manage_system_services',
-  'whm_cpanel_get_system_load_metrics': 'whm_cpanel_manage_system_services',
-  'whm_cpanel_read_system_log_lines': 'whm_cpanel_manage_system_services',
-  'whm_cpanel_list_user_files': 'whm_cpanel_search_account_files',
-  'whm_cpanel_read_user_file': 'whm_cpanel_search_account_files',
-  'whm_cpanel_write_user_file': 'whm_cpanel_manage_account_files',
-  'whm_cpanel_delete_user_file': 'whm_cpanel_manage_account_files',
-};
-
-// Mapa de categorias para routing de tools consolidadas (substitui prefix matching)
+// Mapa de categorias para routing de tools consolidadas
 const TOOL_CATEGORIES = {
   'whm_cpanel_search_hosting_accounts': 'whm',
   'whm_cpanel_manage_hosting_accounts': 'whm',
@@ -140,10 +89,10 @@ const TOOL_CATEGORIES = {
   'whm_cpanel_manage_system_services': 'ssh',
   'whm_cpanel_search_account_files': 'file',
   'whm_cpanel_manage_account_files': 'file',
-  'whm_cpanel_list_server_resources': 'bridge',
-  'whm_cpanel_read_server_resource': 'bridge',
-  'whm_cpanel_list_server_prompts': 'bridge',
-  'whm_cpanel_get_analysis_prompt': 'bridge',
+  'whm_cpanel_list_server_resources': 'utility',
+  'whm_cpanel_read_server_resource': 'utility',
+  'whm_cpanel_list_server_prompts': 'utility',
+  'whm_cpanel_get_analysis_prompt': 'utility',
 };
 
 /**
@@ -474,8 +423,8 @@ function buildToolDefinitions() {
   ];
 }
 
-// SPEC-WHM-ENHANCE-001 / F08 - Bridge tools adicionados ao toolDefinitions
-const bridgeToolDefs = [
+// SPEC-WHM-ENHANCE-001 / F08 - Tools utilitarias (resources e prompts)
+const utilityToolDefs = [
   {
     name: 'whm_cpanel_list_server_resources',
     description: 'Recursos MCP, dados estaticos e configuracao da maquina WHM/cPanel — lista URIs disponiveis (whm://server/config, whm://server/status). Use para descobrir contexto e metadados do servidor WHM. Retorna Markdown com nome, URI e descricao de cada recurso.',
@@ -517,8 +466,8 @@ const bridgeToolDefs = [
   }
 ];
 
-// Carregar tools: 16 consolidadas (com annotations inline) + 4 bridge = 20 tools
-const toolDefinitions = [...buildToolDefinitions(), ...bridgeToolDefs];
+// Carregar tools: 12 consolidadas + 4 utilitarias = 16 tools
+const toolDefinitions = [...buildToolDefinitions(), ...utilityToolDefs];
 
 class MCPHandler {
   constructor() {
@@ -706,13 +655,6 @@ class MCPHandler {
       return this.errorResponse(id, -32602, 'Invalid params', { reason: 'Tool name required' });
     }
 
-    // SPEC-WHM-ENHANCE-001 / F06: Backward compatibility via TOOL_ALIASES
-    if (TOOL_ALIASES[name]) {
-      const newName = TOOL_ALIASES[name];
-      logger.warn(`[DEPRECATION] Tool "${name}" foi renomeada para "${newName}". Atualize suas automacoes.`);
-      name = newName;
-    }
-
     // Verificar se tool existe
     const tool = toolDefinitions.find(t => t.name === name);
     if (!tool) {
@@ -798,8 +740,8 @@ class MCPHandler {
         return await this.executeSshTool(name, enrichedArgs);
       case 'file':
         return await this.executeFileTool(name, enrichedArgs);
-      case 'bridge':
-        return await this.executeBridgeTool(name, enrichedArgs);
+      case 'utility':
+        return await this.executeUtilityTool(name, enrichedArgs);
       default:
         throw new Error(`Unknown tool category for: ${name}`);
     }
@@ -1383,7 +1325,7 @@ class MCPHandler {
   /**
    * SPEC-WHM-ENHANCE-001 / F08 - Bridge tools
    */
-  async executeBridgeTool(name, args) {
+  async executeUtilityTool(name, args) {
     switch (name) {
       case 'whm_cpanel_list_server_resources':
         return listResources().map(r => `- **${r.name}**: \`${r.uri}\` — ${r.description}`).join('\n');

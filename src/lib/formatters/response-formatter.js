@@ -8,7 +8,7 @@
  * Recebe dados como OBJETOS JS, NAO como strings JSON.
  * NUNCA fazer JSON.stringify -> JSON.parse round-trip.
  *
- * REQ-F01-010: TOOL_FORMATTERS tem entrada para CADA tool (16 consolidadas + 4 bridge = 20).
+ * REQ-F01-010: TOOL_FORMATTERS tem entrada para CADA tool (12 core + 4 utilitarias = 16).
  */
 
 const {
@@ -24,13 +24,13 @@ const {
 const { checkResponseSize, paginate } = require('./markdown-helpers');
 
 /**
- * Mapa de formatters para as 16 tools consolidadas + 4 bridge = 20 tools.
+ * Mapa de formatters para as 16 tools (12 core + 4 utilitarias).
  * Cada entrada converte dados da resposta em Markdown.
  *
  * Pattern (identico ao Hudu/Veeam):
  * - search_* tools: roteiam por searchType -> lista Markdown paginada
  * - manage_* tools: roteiam por action -> detalhe ou operacao Markdown
- * - bridge tools: retornam strings direto (type check)
+ * - utility tools: retornam strings direto (type check)
  */
 const TOOL_FORMATTERS = {
   // === CONTAS (2) ===
@@ -132,7 +132,7 @@ const TOOL_FORMATTERS = {
     return formatOperationResult(data, args?.action);
   },
 
-  // === BRIDGE (4) ===
+  // === UTILITARIOS (4) ===
   'whm_cpanel_list_server_resources': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
   'whm_cpanel_read_server_resource': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
   'whm_cpanel_list_server_prompts': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
