@@ -239,8 +239,27 @@ function sanitizeDomain(domain) {
   return String(domain).trim().toLowerCase();
 }
 
+/**
+ * Cria erro MCP padronizado em 3 partes (SPEC-WHM-ENHANCE-001 / F09)
+ * Pattern: O que errou | O que era esperado | Exemplo de uso correto
+ * @param {string} problem - O que deu errado
+ * @param {string} expected - O que era esperado
+ * @param {string} example - Exemplo de uso correto
+ * @returns {{ content: Array, isError: boolean }}
+ */
+function createMCPError(problem, expected, example) {
+  return {
+    content: [{
+      type: 'text',
+      text: `${problem}. ${expected}. Exemplo: ${example}`
+    }],
+    isError: true
+  };
+}
+
 module.exports = {
   validateDomain,
   validateSubdomain,
-  sanitizeDomain
+  sanitizeDomain,
+  createMCPError
 };
