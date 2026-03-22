@@ -107,7 +107,7 @@ describe('AC02: Lista de Tools MCP', () => {
       .send({ jsonrpc: '2.0', method: 'tools/list', id: 1 });
 
     const tools = response.body.result.tools;
-    const dnsTools = tools.filter(t => t.name.includes('_dns_'));
+    const dnsTools = tools.filter(t => t.name.includes('_dns'));
     expect(dnsTools.length).toBeGreaterThan(0);
   });
 });
