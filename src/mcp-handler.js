@@ -1,6 +1,7 @@
 /**
  * MCP Handler - Processa requisicoes JSON-RPC 2.0
  * Implementa AC02: Lista de Tools MCP
+ * SPEC-WHM-ENHANCE-001 / F06: Consolidacao 44 para 16 tools (search_x/manage_x pattern)
  * Correções aplicadas:
  * - GAP-IMP-02: Suporte a header X-MCP-Safety-Token
  */
@@ -10,6 +11,8 @@ const DNSService = require('./lib/dns-service');
 const SSHManager = require('./lib/ssh-manager');
 const FileManager = require('./lib/file-manager');
 const logger = require('./lib/logger');
+const { formatToolResponse } = require('./lib/formatters/response-formatter');
+const { WHM_RESOURCES, listResources, readResource } = require('./lib/resources');
 const SafetyGuard = require('./lib/safety-guard');
 const { measureToolExecution, recordError } = require('./lib/metrics');
 const { withOperationTimeout, withTimeout, TimeoutError } = require('./lib/timeout');
@@ -56,699 +59,466 @@ function extractAclToken(args, headers = {}) {
   return headerToken;
 }
 
-// Carregar tools do schema
-const toolDefinitions = buildToolDefinitions();
+// SPEC-WHM-ENHANCE-001 / F05 - Server Instructions (<2000 chars)
+const WHM_INSTRUCTIONS = `MCP WHM/cPanel - Hospedagem, dominios, DNS e servidor. Respostas em Markdown.
 
-// Mapa de categorias para routing de tools (substitui prefix matching)
-const TOOL_CATEGORIES = {
-  // WHM Account Tools
-  'whm_cpanel_list_accounts': 'whm',
-  'whm_cpanel_create_account': 'whm',
-  'whm_cpanel_suspend_account': 'whm',
-  'whm_cpanel_unsuspend_account': 'whm',
-  'whm_cpanel_delete_account': 'whm',
-  'whm_cpanel_get_account_summary': 'whm',
-  'whm_cpanel_get_server_status': 'whm',
-  'whm_cpanel_get_services_status': 'whm',
-  'whm_cpanel_restart_service': 'whm',
-  'whm_cpanel_list_account_domains': 'whm',
-  // Domain Tools
-  'whm_cpanel_get_domain_data': 'domain',
-  'whm_cpanel_list_all_domains': 'domain',
-  'whm_cpanel_get_domain_owner': 'domain',
-  'whm_cpanel_create_domain_alias': 'domain',
-  'whm_cpanel_create_subdomain': 'domain',
-  'whm_cpanel_delete_domain': 'domain',
-  'whm_cpanel_resolve_domain_ip': 'domain',
-  'whm_cpanel_list_addon_domains': 'domain',
-  'whm_cpanel_get_addon_domain_details': 'domain',
-  'whm_cpanel_get_addon_conversion_status': 'domain',
-  'whm_cpanel_create_addon_conversion': 'domain',
-  'whm_cpanel_get_addon_conversion_details': 'domain',
-  'whm_cpanel_list_addon_conversions': 'domain',
-  'whm_cpanel_check_domain_authority': 'domain',
-  'whm_cpanel_get_dnssec_ds_records': 'domain',
-  'whm_cpanel_enable_dnssec_nsec3': 'domain',
-  'whm_cpanel_disable_dnssec_nsec3': 'domain',
-  'whm_cpanel_get_nsec3_operation_status': 'domain',
-  'whm_cpanel_update_userdomains_cache': 'domain',
-  // DNS Tools
-  'whm_cpanel_list_dns_zones': 'dns',
-  'whm_cpanel_get_dns_zone_records': 'dns',
-  'whm_cpanel_check_dns_nested_subdomains': 'dns',
-  'whm_cpanel_search_dns_record': 'dns',
-  'whm_cpanel_create_dns_record': 'dns',
-  'whm_cpanel_update_dns_record': 'dns',
-  'whm_cpanel_delete_dns_record': 'dns',
-  'whm_cpanel_reset_dns_zone': 'dns',
-  'whm_cpanel_list_dns_mx_records': 'dns',
-  'whm_cpanel_create_dns_mx_record': 'dns',
-  'whm_cpanel_check_dns_alias_available': 'dns',
-  // SSH/System Tools
-  'whm_cpanel_restart_system_service': 'ssh',
-  'whm_cpanel_get_system_load_metrics': 'ssh',
-  'whm_cpanel_read_system_log_lines': 'ssh',
-  // File Tools
-  'whm_cpanel_list_user_files': 'file',
-  'whm_cpanel_read_user_file': 'file',
-  'whm_cpanel_write_user_file': 'file',
-  'whm_cpanel_delete_user_file': 'file',
+CONTAS: search_hosting_accounts (searchType: list/summary/domains) | manage_hosting_accounts (action: create/suspend/unsuspend/delete)
+SERVIDOR: search_server_status (type: status/services) | manage_server_service (action: restart_service)
+DOMINIOS: search_hosted_domains (searchType: all/data/owner/addons/addon_details/authority) | manage_hosted_domains (action: create_alias/create_subdomain/delete/resolve_ip/get_conversion_status/create_conversion/get_conversion_details/list_conversions/update_cache)
+DNS: search_dns_zone_records (searchType: zones/records/search/mx_records/nested_subdomains/alias_check) | manage_dns_zone_records (action: create/update/delete/reset_zone/create_mx) | manage_dnssec_settings (action: get_ds_records/enable_nsec3/disable_nsec3/get_status)
+SISTEMA: manage_system_services (action: restart_service/get_load/read_logs) | search_account_files (searchType: list/read) | manage_account_files (action: write/delete)
+BRIDGE: list_server_resources, read_server_resource, list_server_prompts, get_analysis_prompt
+
+Prefixo: whm_cpanel_. search_ para leitura, manage_ para mutacao. Operacoes destrutivas requerem confirmationToken.
+
+Exemplos:
+- whm_cpanel_search_hosting_accounts {searchType:"list"}
+- whm_cpanel_manage_dns_zone_records {action:"create", zone:"exemplo.com", type:"A", name:"www", address:"1.2.3.4"}`;
+
+// SPEC-WHM-ENHANCE-001 / F06 - Tool Aliases (backward compatibility)
+const TOOL_ALIASES = {
+  'whm_cpanel_list_accounts': 'whm_cpanel_search_hosting_accounts',
+  'whm_cpanel_get_account_summary': 'whm_cpanel_search_hosting_accounts',
+  'whm_cpanel_list_account_domains': 'whm_cpanel_search_hosting_accounts',
+  'whm_cpanel_create_account': 'whm_cpanel_manage_hosting_accounts',
+  'whm_cpanel_suspend_account': 'whm_cpanel_manage_hosting_accounts',
+  'whm_cpanel_unsuspend_account': 'whm_cpanel_manage_hosting_accounts',
+  'whm_cpanel_delete_account': 'whm_cpanel_manage_hosting_accounts',
+  'whm_cpanel_get_server_status': 'whm_cpanel_search_server_status',
+  'whm_cpanel_get_services_status': 'whm_cpanel_search_server_status',
+  'whm_cpanel_restart_service': 'whm_cpanel_manage_server_service',
+  'whm_cpanel_list_all_domains': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_get_domain_data': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_get_domain_owner': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_list_addon_domains': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_get_addon_domain_details': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_check_domain_authority': 'whm_cpanel_search_hosted_domains',
+  'whm_cpanel_create_domain_alias': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_create_subdomain': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_delete_domain': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_resolve_domain_ip': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_get_addon_conversion_status': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_create_addon_conversion': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_get_addon_conversion_details': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_list_addon_conversions': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_update_userdomains_cache': 'whm_cpanel_manage_hosted_domains',
+  'whm_cpanel_get_dnssec_ds_records': 'whm_cpanel_manage_dnssec_settings',
+  'whm_cpanel_enable_dnssec_nsec3': 'whm_cpanel_manage_dnssec_settings',
+  'whm_cpanel_disable_dnssec_nsec3': 'whm_cpanel_manage_dnssec_settings',
+  'whm_cpanel_get_nsec3_operation_status': 'whm_cpanel_manage_dnssec_settings',
+  'whm_cpanel_list_dns_zones': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_get_dns_zone_records': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_search_dns_record': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_list_dns_mx_records': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_check_dns_nested_subdomains': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_check_dns_alias_available': 'whm_cpanel_search_dns_zone_records',
+  'whm_cpanel_create_dns_record': 'whm_cpanel_manage_dns_zone_records',
+  'whm_cpanel_update_dns_record': 'whm_cpanel_manage_dns_zone_records',
+  'whm_cpanel_delete_dns_record': 'whm_cpanel_manage_dns_zone_records',
+  'whm_cpanel_reset_dns_zone': 'whm_cpanel_manage_dns_zone_records',
+  'whm_cpanel_create_dns_mx_record': 'whm_cpanel_manage_dns_zone_records',
+  'whm_cpanel_restart_system_service': 'whm_cpanel_manage_system_services',
+  'whm_cpanel_get_system_load_metrics': 'whm_cpanel_manage_system_services',
+  'whm_cpanel_read_system_log_lines': 'whm_cpanel_manage_system_services',
+  'whm_cpanel_list_user_files': 'whm_cpanel_search_account_files',
+  'whm_cpanel_read_user_file': 'whm_cpanel_search_account_files',
+  'whm_cpanel_write_user_file': 'whm_cpanel_manage_account_files',
+  'whm_cpanel_delete_user_file': 'whm_cpanel_manage_account_files',
 };
 
+// Mapa de categorias para routing de tools consolidadas (substitui prefix matching)
+const TOOL_CATEGORIES = {
+  'whm_cpanel_search_hosting_accounts': 'whm',
+  'whm_cpanel_manage_hosting_accounts': 'whm',
+  'whm_cpanel_search_server_status': 'whm',
+  'whm_cpanel_manage_server_service': 'whm',
+  'whm_cpanel_search_hosted_domains': 'domain',
+  'whm_cpanel_manage_hosted_domains': 'domain',
+  'whm_cpanel_manage_dnssec_settings': 'domain',
+  'whm_cpanel_search_dns_zone_records': 'dns',
+  'whm_cpanel_manage_dns_zone_records': 'dns',
+  'whm_cpanel_manage_system_services': 'ssh',
+  'whm_cpanel_search_account_files': 'file',
+  'whm_cpanel_manage_account_files': 'file',
+  'whm_cpanel_list_server_resources': 'bridge',
+  'whm_cpanel_read_server_resource': 'bridge',
+  'whm_cpanel_list_server_prompts': 'bridge',
+  'whm_cpanel_get_analysis_prompt': 'bridge',
+};
 
 /**
- * Constroi definicoes de tools para MCP
- * Descricoes claras e detalhadas para guiar o modelo na escolha correta da tool
+ * Constroi definicoes de tools consolidadas para MCP
+ * SPEC-WHM-ENHANCE-001 / F06: 16 tools consolidadas com annotations inline
  */
 function buildToolDefinitions() {
   return [
     // ==========================================
-    // WHM ACCOUNT TOOLS - Gerenciamento de Contas
+    // CONTAS - search_accounts / manage_accounts
     // ==========================================
     {
-      name: 'whm_cpanel_list_accounts',
-      description: 'Contas de hospedagem, clientes e planos no WHM/cPanel — inventario completo de contas ativas e suspensas no servidor. Use no WHM quando precisar localizar conta, verificar status ou auditar ocupacao do servidor. Retorna array com username, dominio, email, pacote, uso de disco e status de cada conta no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      }
-    },
-    {
-      name: 'whm_cpanel_create_account',
-      description: 'Conta de hospedagem nova no WHM/cPanel — provisionamento de cliente com dominio, usuario e pacote configuraveis. Use no WHM quando precisar criar conta para novo cliente ou ambiente de teste. Requer confirmationToken. Retorna dados da conta criada incluindo usuario, dominio principal e IP atribuido no cPanel.',
+      name: 'whm_cpanel_search_hosting_accounts',
+      description: 'Contas de hospedagem, clientes e planos no WHM/cPanel — inventario completo de contas ativas, suspensas, resumo de recursos e dominios por conta. Use searchType list para listar todas, summary para detalhes de uma conta, domains para dominios. Retorna Markdown com dados paginados do servidor WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          username: { type: 'string', description: 'Nome de usuario (max 8 chars, sem espacos)' },
-          domain: { type: 'string', description: 'Dominio principal da conta (ex: exemplo.com.br)' },
-          password: { type: 'string', description: 'Senha da conta (min 8 chars, complexidade requerida)' },
-          email: { type: 'string', description: 'Email de contato do proprietario' },
-          package: { type: 'string', description: 'Plano de hospedagem (ex: default, business, enterprise)' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da criacao (auditoria)' }
+          searchType: {
+            type: 'string',
+            enum: ['list', 'summary', 'domains'],
+            description: 'Tipo de busca: list (listar contas), summary (resumo de conta), domains (dominios de conta)'
+          },
+          username: { type: 'string', description: 'Username da conta (obrigatorio para summary e domains)' },
+          limit: { type: 'integer', default: 25, description: 'Maximo de resultados por pagina (default: 25, max: 50)' },
+          offset: { type: 'integer', default: 0, description: 'Numero de resultados a pular (para paginacao)' }
         },
-        required: ['username', 'domain', 'password']
-      }
+        required: ['searchType'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_suspend_account',
-      description: 'Suspensao de conta de hospedagem, cliente ou usuario no WHM/cPanel — bloqueia acesso ao cPanel, FTP e email. Use no WHM quando houver inadimplencia, violacao de termos ou manutencao programada. Dados preservados, operacao reversivel via whm_cpanel_unsuspend_account. Requer motivo visivel ao cliente.',
+      name: 'whm_cpanel_manage_hosting_accounts',
+      description: 'Conta de hospedagem no WHM/cPanel — criar, suspender, reativar ou remover contas de clientes. Acoes destrutivas (delete) requerem confirmationToken e confirm=true. Suspensao preserva dados e e reversivel. Criacao requer username, domain e password. Retorna Markdown com status da operacao no servidor WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          username: { type: 'string', description: 'Username da conta a suspender' },
-          reason: { type: 'string', description: 'Motivo da suspensao (obrigatorio, visivel ao cliente)' },
+          action: {
+            type: 'string',
+            enum: ['create', 'suspend', 'unsuspend', 'delete'],
+            description: 'Acao: create (criar), suspend (suspender), unsuspend (reativar), delete (remover permanente)'
+          },
+          username: { type: 'string', description: 'Username da conta (obrigatorio para todas as acoes)' },
+          domain: { type: 'string', description: 'Dominio principal (obrigatorio para create)' },
+          password: { type: 'string', description: 'Senha da conta (obrigatorio para create, min 8 chars)' },
+          email: { type: 'string', description: 'Email de contato (create)' },
+          package: { type: 'string', description: 'Plano de hospedagem (create, ex: default, business)' },
+          reason: { type: 'string', description: 'Motivo da operacao (obrigatorio para suspend, recomendado para demais)' },
+          confirm: { type: 'boolean', description: 'Confirmacao obrigatoria para delete (deve ser true)' },
           confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' }
         },
-        required: ['username', 'reason']
-      }
+        required: ['action', 'username'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
+
+    // ==========================================
+    // SERVIDOR - search_server / manage_server
+    // ==========================================
     {
-      name: 'whm_cpanel_unsuspend_account',
-      description: 'Reativacao de conta suspensa, cliente ou hospedagem no WHM/cPanel — restaura acesso completo ao cPanel, FTP, email e website. Use no WHM quando o cliente regularizar pagamento ou motivo da suspensao for resolvido. Retorna confirmacao da reativacao e status atualizado da conta no servidor WHM.',
+      name: 'whm_cpanel_search_server_status',
+      description: 'Status do servidor WHM/cPanel — monitoramento geral incluindo load average, uptime, versao e estado de servicos (Apache, MySQL, DNS, FTP, email). Use type status para saude geral do servidor, services para estado individual de cada daemon. Retorna Markdown com metricas e estados de servicos do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          username: { type: 'string', description: 'Username da conta a reativar' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da reativacao (auditoria)' }
+          type: {
+            type: 'string',
+            enum: ['status', 'services'],
+            description: 'Tipo de consulta: status (saude geral), services (estado de cada servico)'
+          }
         },
-        required: ['username']
-      }
+        required: ['type'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_delete_account',
-      description: 'Remocao permanente de conta de hospedagem no WHM/cPanel — deleta arquivos, emails, bancos e configuracoes do cliente. Use no WHM apenas para cancelamento definitivo. Acao destrutiva e irreversivel. Requer confirmationToken, flag confirm=true e motivo detalhado para auditoria no WHM/cPanel.',
+      name: 'whm_cpanel_manage_server_service',
+      description: 'Reinicio de servico via API do WHM/cPanel — reinicializa daemon para aplicar configuracoes ou resolver travamentos. Causa indisponibilidade temporaria do servico. Servicos validos: httpd, mysql, named, postfix, dovecot, exim, nginx, pure-ftpd. Requer confirmationToken. Retorna Markdown com resultado do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          username: { type: 'string', description: 'Username da conta a remover' },
-          confirm: { type: 'boolean', description: 'Confirmacao OBRIGATORIA (deve ser true)' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da remocao (auditoria, obrigatorio)' }
-        },
-        required: ['username', 'confirm']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_account_summary',
-      description: 'Resumo de conta de hospedagem, cliente e recursos no WHM/cPanel — dados detalhados de uso e configuracao. Use no WHM quando precisar verificar quota de disco, bandwidth ou alocacao de recursos de um cliente especifico. Retorna dominio, email, pacote, uso de disco e bandwidth da conta no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          username: { type: 'string', description: 'Username da conta (exato)' }
-        },
-        required: ['username']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_server_status',
-      description: 'Status do servidor, saude e versao do WHM/cPanel — monitoramento geral incluindo load average e uptime. Use no WHM quando precisar verificar carga de CPU, confirmar versao instalada ou diagnosticar lentidao no servidor. Retorna metricas de carga para 1, 5 e 15 minutos e tempo de atividade do WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      }
-    },
-    {
-      name: 'whm_cpanel_get_services_status',
-      description: 'Servicos, daemons e processos do servidor WHM/cPanel — status de Apache, MySQL, DNS, FTP e email. Use no WHM quando precisar diagnosticar problemas de conectividade ou verificar se servicos estao operacionais. Retorna estado individual de cada servico: ativo, parado ou com falha no servidor WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      }
-    },
-    {
-      name: 'whm_cpanel_restart_service',
-      description: 'Reinicio de servico via API do WHM/cPanel — reinicializa daemon para aplicar configuracoes ou resolver travamentos. Causa indisponibilidade temporaria. Use no WHM para reiniciar httpd, mysql, named, exim, nginx ou pure-ftpd. Requer confirmationToken. Diferente de whm_cpanel_restart_system_service que usa SSH.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          service: { type: 'string', enum: ['httpd', 'mysql', 'named', 'postfix', 'dovecot', 'exim', 'nginx', 'pure-ftpd'], description: 'Nome do servico a reiniciar' },
+          action: {
+            type: 'string',
+            enum: ['restart_service'],
+            description: 'Acao: restart_service (reiniciar servico via API WHM)'
+          },
+          service: {
+            type: 'string',
+            enum: ['httpd', 'mysql', 'named', 'postfix', 'dovecot', 'exim', 'nginx', 'pure-ftpd'],
+            description: 'Nome do servico a reiniciar'
+          },
           confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
           reason: { type: 'string', description: 'Motivo do restart (auditoria)' }
         },
-        required: ['service']
-      }
-    },
-    {
-      name: 'whm_cpanel_list_account_domains',
-      description: 'Dominios de conta cPanel, sites e subdominios no WHM — listagem completa incluindo dominio principal, addon domains e subdominios. Use no WHM quando precisar verificar todos os dominios de um cliente ou auditar configuracao. Retorna lista categorizada por tipo. Requer username da conta cPanel no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          username: { type: 'string', description: 'Username da conta cPanel' }
-        },
-        required: ['username']
-      }
+        required: ['action', 'service'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
 
     // ==========================================
-    // DOMAIN TOOLS - Gerenciamento de Dominios
+    // DOMINIOS - search_domains / manage_domains / manage_dnssec
     // ==========================================
     {
-      name: 'whm_cpanel_get_domain_data',
-      description: 'Dados de dominio, site e hospedagem no WHM/cPanel — informacoes completas incluindo usuario, docroot, IP e versao PHP. Use no WHM quando souber o nome exato do dominio e precisar de detalhes. Mais eficiente que whm_cpanel_list_all_domains para consulta unitaria. Retorna configuracao completa do WHM.',
+      name: 'whm_cpanel_search_hosted_domains',
+      description: 'Dominios, sites e hospedagens no WHM/cPanel — busca paginada com filtros por tipo e nome. searchType: all (listar todos), data (dados de dominio unico), owner (proprietario), addons (addon domains de conta), addon_details (detalhes addon), authority (autoridade DNS). Retorna Markdown com dados do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          domain: { type: 'string', description: 'Nome exato do dominio (ex: servidor.one)' }
+          searchType: {
+            type: 'string',
+            enum: ['all', 'data', 'owner', 'addons', 'addon_details', 'authority'],
+            description: 'Tipo de busca: all (listar), data (dados unico), owner (proprietario), addons (addon domains), addon_details (detalhe addon), authority (autoridade DNS)'
+          },
+          domain: { type: 'string', description: 'Nome do dominio (obrigatorio para data, owner, addon_details, authority)' },
+          username: { type: 'string', description: 'Username cPanel (obrigatorio para addons, addon_details)' },
+          domain_filter: { type: 'string', description: 'Filtrar por nome (substring, case-insensitive). Usado com searchType=all' },
+          limit: { type: 'integer', default: 25, description: 'Maximo de resultados por pagina (default: 25, max: 50)' },
+          offset: { type: 'integer', default: 0, description: 'Numero de resultados a pular (para paginacao)' },
+          filter: { type: 'string', enum: ['addon', 'alias', 'subdomain', 'main'], description: 'Filtrar por tipo de dominio (usado com searchType=all)' }
         },
-        required: ['domain']
-      }
+        required: ['searchType'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_list_all_domains',
-      description: 'Dominios, sites e hospedagens no WHM/cPanel — listagem paginada com filtros por tipo e nome. Use no WHM quando precisar buscar dominios por substring ou tipo (addon, alias, subdomain, main). Retorna array paginado com detalhes. Para dominio unico, prefira whm_cpanel_get_domain_data no cPanel.',
+      name: 'whm_cpanel_manage_hosted_domains',
+      description: 'Dominios, sites e enderecos web no WHM/cPanel — criar alias, subdominio, deletar, resolver IP, conversoes addon e cache. Acoes destrutivas (delete) requerem confirmationToken. Conversoes criam conta independente a partir de addon. resolve_ip consulta apontamento DNS. update_cache sincroniza userdomains. Retorna Markdown do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          domain_filter: { type: 'string', description: 'IMPORTANTE: Filtrar por nome do dominio (substring, case-insensitive). Ex: "servidor" retorna "servidor.one", "api.servidor.one", etc. SEMPRE use quando buscar dominio especifico!' },
-          limit: { type: 'integer', default: 100, description: 'Numero maximo de dominios por pagina (max 1000)' },
-          offset: { type: 'integer', default: 0, description: 'Numero de dominios a pular (para paginacao)' },
-          filter: { type: 'string', enum: ['addon', 'alias', 'subdomain', 'main'], description: 'Filtrar por tipo de dominio (opcional)' }
-        },
-        required: []
-      }
-    },
-    {
-      name: 'whm_cpanel_get_domain_owner',
-      description: 'Proprietario de dominio, conta e usuario cPanel no WHM — identifica qual conta hospeda determinado dominio ou site. Use no WHM quando precisar descobrir o dono de um dominio antes de realizar alteracoes. Retorna o username cPanel associado. Consulta somente leitura sem efeitos colaterais no servidor WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do dominio' }
-        },
-        required: ['domain']
-      }
-    },
-    {
-      name: 'whm_cpanel_create_domain_alias',
-      description: 'Alias de dominio, parked domain e redirecionamento no WHM/cPanel — cria dominio alternativo apontando para conteudo existente. Use no WHM quando cliente precisar de dominio adicional redirecionado ao principal. O target_domain assume o dominio principal se omitido. Retorna confirmacao de criacao no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do novo dominio alias (ex: novodominio.com)' },
-          username: { type: 'string', description: 'Proprietario - usuario cPanel que tera o dominio' },
-          target_domain: { type: 'string', description: 'Dominio alvo que sera apontado (opcional, default: dominio principal da conta)' }
-        },
-        required: ['domain', 'username']
-      }
-    },
-    {
-      name: 'whm_cpanel_create_subdomain',
-      description: 'Subdominio, endereco e aplicacao web no WHM/cPanel — cria subdominio vinculado a dominio existente da conta. Use no WHM quando precisar configurar enderecos como blog.exemplo.com ou api.exemplo.com. O document_root e auto-gerado se omitido. Retorna configuracao do subdominio criado e docroot no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          subdomain: { type: 'string', description: 'Nome do subdominio SEM o dominio pai (ex: "blog" para blog.exemplo.com)' },
-          domain: { type: 'string', description: 'Dominio pai (ex: "exemplo.com")' },
-          username: { type: 'string', description: 'Usuario cPanel proprietario' },
-          document_root: { type: 'string', description: 'Raiz do documento - path no servidor (opcional, auto-gerado se omitido)' }
-        },
-        required: ['subdomain', 'domain', 'username']
-      }
-    },
-    {
-      name: 'whm_cpanel_delete_domain',
-      description: 'Remocao de dominio, addon ou subdominio no WHM/cPanel — deleta configuracao de dominio da conta. Operacao destrutiva e irreversivel. Use no WHM apenas quando dominio nao for mais necessario. Requer tipo (addon, parked, subdomain), confirmationToken e motivo detalhado para auditoria no WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do dominio a deletar' },
-          username: { type: 'string', description: 'Usuario cPanel proprietario' },
-          type: { type: 'string', enum: ['addon', 'parked', 'subdomain'], description: 'Tipo de dominio (obrigatorio)' },
+          action: {
+            type: 'string',
+            enum: ['create_alias', 'create_subdomain', 'delete', 'resolve_ip', 'get_conversion_status', 'create_conversion', 'get_conversion_details', 'list_conversions', 'update_cache'],
+            description: 'Acao a executar no dominio'
+          },
+          domain: { type: 'string', description: 'Nome do dominio (obrigatorio para create_alias, create_subdomain, delete, resolve_ip, create_conversion)' },
+          username: { type: 'string', description: 'Usuario cPanel proprietario (obrigatorio para create_alias, create_subdomain, delete, create_conversion)' },
+          subdomain: { type: 'string', description: 'Nome do subdominio sem dominio pai (obrigatorio para create_subdomain, ex: "blog")' },
+          target_domain: { type: 'string', description: 'Dominio alvo para alias (opcional, default: dominio principal da conta)' },
+          document_root: { type: 'string', description: 'Raiz do documento para subdominio (opcional, auto-gerado)' },
+          type: { type: 'string', enum: ['addon', 'parked', 'subdomain'], description: 'Tipo de dominio (obrigatorio para delete)' },
+          new_username: { type: 'string', description: 'Novo username para conversao addon (obrigatorio para create_conversion)' },
+          conversion_id: { type: 'string', description: 'ID da conversao (obrigatorio para get_conversion_status, get_conversion_details)' },
           confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo detalhado da delecao (auditoria, min 10 chars)' }
+          reason: { type: 'string', description: 'Motivo da operacao (auditoria)' }
         },
-        required: ['domain', 'username', 'type', 'confirmationToken', 'reason']
-      }
+        required: ['action'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_resolve_domain_ip',
-      description: 'Resolucao DNS, IP e endereco de dominio no WHM/cPanel — consulta para qual IP um dominio aponta no servidor. Use no WHM quando precisar verificar apontamento ou diagnosticar problemas de resolucao DNS. Retorna endereco IP correspondente ao dominio consultado. Consulta somente leitura no servidor WHM.',
+      name: 'whm_cpanel_manage_dnssec_settings',
+      description: 'DNSSEC e NSEC3 no WHM/cPanel — gerenciar seguranca DNS de dominios. get_ds_records obtem chaves DS para registrar. enable_nsec3 ativa protecao contra zone walking. disable_nsec3 reverte para NSEC. get_status consulta operacao assincrona. Aceita ate 100 dominios por chamada. Retorna Markdown do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          domain: { type: 'string', description: 'Nome do dominio a resolver' }
-        },
-        required: ['domain']
-      }
-    },
-
-    // Addon Domain Tools
-    {
-      name: 'whm_cpanel_list_addon_domains',
-      description: 'Addon domains, dominios adicionais e hospedagens extras no WHM/cPanel — listagem de addons de uma conta especifica. Use no WHM quando precisar ver apenas addon domains de um usuario. Diferente de whm_cpanel_list_account_domains que inclui todos os tipos, retorna apenas addons com detalhes do WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          username: { type: 'string', description: 'Usuario cPanel' }
-        },
-        required: ['username']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_addon_domain_details',
-      description: 'Detalhes de addon domain, configuracao e docroot no WHM/cPanel — informacoes completas de um addon especifico. Use no WHM quando precisar verificar document root, subdominio vinculado ou configuracao detalhada. Retorna docroot, subdominio associado e demais propriedades do addon domain no servidor WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do addon domain' },
-          username: { type: 'string', description: 'Usuario cPanel proprietario' }
-        },
-        required: ['domain', 'username']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_addon_conversion_status',
-      description: 'Status de conversao de addon domain no WHM/cPanel — acompanhamento de migracao para conta independente. Use no WHM para verificar progresso de conversao em andamento. Retorna estado: pendente, concluido ou falha. O conversion_id e obtido via whm_cpanel_create_addon_conversion no servidor WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          conversion_id: { type: 'string', description: 'ID da conversao (retornado por whm_cpanel_create_addon_conversion)' }
-        },
-        required: ['conversion_id']
-      }
-    },
-    {
-      name: 'whm_cpanel_create_addon_conversion',
-      description: 'Conversao de addon domain para conta independente no WHM/cPanel — migracao estrutural de dominio para hospedagem propria. Alteracao irreversivel que afeta estrutura de contas. Use no WHM quando cliente precisar de conta separada. Requer confirmationToken. Retorna conversion_id para polling no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Addon domain a converter' },
-          username: { type: 'string', description: 'Usuario cPanel atual (dono do addon)' },
-          new_username: { type: 'string', description: 'Novo username para a conta independente' },
-          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da conversao (auditoria, min 10 chars)' }
-        },
-        required: ['domain', 'username', 'new_username', 'confirmationToken', 'reason']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_addon_conversion_details',
-      description: 'Detalhes de conversao de addon, logs e historico no WHM/cPanel — diagnostico completo de migracao em andamento ou finalizada. Use no WHM quando precisar investigar falhas ou verificar etapas da conversao. Diferente de whm_cpanel_get_addon_conversion_status, retorna logs completos e historico no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          conversion_id: { type: 'string', description: 'ID da conversao' }
-        },
-        required: ['conversion_id']
-      }
-    },
-    {
-      name: 'whm_cpanel_list_addon_conversions',
-      description: 'Historico de conversoes de addon domains no WHM/cPanel — registro completo de migracoes para contas independentes. Use no WHM quando precisar auditar conversoes passadas ou verificar se ha conversoes pendentes. Retorna lista com status, datas e dominios envolvidos em cada operacao no servidor WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      }
-    },
-
-    // Domain Authority and DNSSEC Tools
-    {
-      name: 'whm_cpanel_check_domain_authority',
-      description: 'Autoridade DNS de dominio, zona e controle no WHM/cPanel — verifica se o servidor e autoritativo para o dominio. Use no WHM antes de editar registros DNS para confirmar autoridade sobre a zona. Retorna status booleano. Verificacao essencial antes de qualquer operacao de DNS no servidor WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do dominio a verificar' }
-        },
-        required: ['domain']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_dnssec_ds_records',
-      description: 'Registros DS e DNSSEC, delegacao e seguranca de dominios no WHM/cPanel — obtem chaves para configuracao no registrar. Use no WHM quando precisar configurar DNSSEC ou verificar assinaturas existentes. Aceita lista de ate 100 dominios por chamada. Retorna registros DS necessarios para ativacao no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 100)' }
-        },
-        required: ['domains']
-      }
-    },
-    {
-      name: 'whm_cpanel_enable_dnssec_nsec3',
-      description: 'NSEC3 e DNSSEC aprimorado, protecao contra zone walking no WHM/cPanel — habilita seguranca avancada de DNS. Altera resolucao DNS dos dominios afetados. Aceita ate 50 dominios. Requer confirmationToken. Operacao assincrona que retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 50)' },
-          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
+          action: {
+            type: 'string',
+            enum: ['get_ds_records', 'enable_nsec3', 'disable_nsec3', 'get_status'],
+            description: 'Acao: get_ds_records, enable_nsec3, disable_nsec3, get_status'
+          },
+          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (obrigatorio para get_ds_records, enable_nsec3, disable_nsec3; max 100)' },
+          operation_id: { type: 'string', description: 'ID da operacao NSEC3 (obrigatorio para get_status)' },
+          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN, obrigatorio para enable/disable)' },
           reason: { type: 'string', description: 'Motivo da alteracao (auditoria, min 10 chars)' }
         },
-        required: ['domains', 'confirmationToken', 'reason']
-      }
-    },
-    {
-      name: 'whm_cpanel_disable_dnssec_nsec3',
-      description: 'Desativacao de NSEC3, reversao para NSEC padrao no WHM/cPanel — remove protecao avancada de DNSSEC. Reduz seguranca DNS dos dominios afetados. Aceita ate 50 dominios. Requer confirmationToken. Operacao assincrona que retorna operation_id para polling via whm_cpanel_get_nsec3_operation_status no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios (maximo 50)' },
-          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da alteracao (auditoria, min 10 chars)' }
-        },
-        required: ['domains', 'confirmationToken', 'reason']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_nsec3_operation_status',
-      description: 'Status de operacao NSEC3, progresso e resultado no WHM/cPanel — acompanhamento de enable/disable DNSSEC assincrono. Use no WHM para polling de operacoes NSEC3 em andamento. O operation_id e retornado por whm_cpanel_enable_dnssec_nsec3 ou whm_cpanel_disable_dnssec_nsec3. Retorna: pendente, concluido ou falha.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          operation_id: { type: 'string', description: 'ID da operacao NSEC3' }
-        },
-        required: ['operation_id']
-      }
-    },
-    {
-      name: 'whm_cpanel_update_userdomains_cache',
-      description: 'Cache de dominios, mapeamento /etc/userdomains no WHM/cPanel — sincroniza associacao entre dominios e usuarios. Pode afetar resolucao de dominios temporariamente. Use no WHM apenas para corrigir inconsistencias apos migracoes. Requer confirmationToken. Operacao protegida por lock no servidor WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          confirmationToken: { type: 'string', description: 'Token de seguranca (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da atualizacao (auditoria, min 10 chars)' }
-        },
-        required: ['confirmationToken', 'reason']
-      }
+        required: ['action'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
 
     // ==========================================
-    // DNS TOOLS - Gerenciamento de Zonas DNS
+    // DNS - search_dns / manage_dns
     // ==========================================
     {
-      name: 'whm_cpanel_list_dns_zones',
-      description: 'Zonas DNS, dominios e registros gerenciados no WHM/cPanel — inventario completo de zonas ativas no servidor. Use no WHM quando precisar visualizar todos os dominios com DNS configurado ou localizar zona para edicao. Retorna array de zonas DNS com status. Consulta somente leitura sem parametros no cPanel.',
-      inputSchema: dnsSchema.tools['whm_cpanel_list_dns_zones'].inputSchema
-    },
-    {
-      name: 'whm_cpanel_get_dns_zone_records',
-      description: 'Registros DNS, entradas e configuracao de zona no WHM/cPanel — visualizacao completa com filtros por tipo e nome. Use no WHM quando precisar ver todos os registros de um dominio. Retorna lista numerada por linha com tipo, nome e valor. Para registro especifico, prefira whm_cpanel_search_dns_record no cPanel.',
+      name: 'whm_cpanel_search_dns_zone_records',
+      description: 'Zonas e registros DNS no WHM/cPanel — busca completa com filtros por tipo e nome. searchType: zones (listar zonas), records (registros de zona), search (buscar registro especifico), mx_records (registros MX), nested_subdomains (analise hierarquica), alias_check (disponibilidade). Retorna Markdown do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio (ex: exemplo.com.br)' },
-          record_type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'], description: 'Filtrar por tipo de registro (ex: A, MX, TXT)' },
-          name_filter: { type: 'string', description: 'Filtrar por nome de registro (substring). Ex: "www" encontra www, www2, api-www' },
-          max_records: { type: 'integer', default: 500, description: 'Limite de registros retornados (default: 500, max: 2000)' },
-          include_stats: { type: 'boolean', default: false, description: 'Incluir estatisticas de subdominios aninhados' }
-        },
-        required: ['zone']
-      }
-    },
-    {
-      name: 'whm_cpanel_check_dns_nested_subdomains',
-      description: 'Subdominios aninhados, niveis e complexidade de zona DNS no WHM/cPanel — analise estrutural de hierarquia. Use no WHM para diagnosticar zonas complexas com muitos niveis antes de alteracoes. Retorna estatisticas de aninhamento e profundidade de subdominios que ajudam a mapear a zona DNS no WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Dominio a verificar (ex: skillsit.com.br)' }
-        },
-        required: ['zone']
-      }
-    },
-    {
-      name: 'whm_cpanel_search_dns_record',
-      description: 'Busca de registro DNS, consulta e localizacao na zona do WHM/cPanel — pesquisa com modos exact, contains ou startsWith. Use no WHM quando precisar localizar registro especifico de forma eficiente. Retorna registros com numero de linha necessario para edicao via whm_cpanel_update_dns_record no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          name: { type: 'string', description: 'Nome do registro a buscar (ex: www, @, mail, prometheus)' },
+          searchType: {
+            type: 'string',
+            enum: ['zones', 'records', 'search', 'mx_records', 'nested_subdomains', 'alias_check'],
+            description: 'Tipo de busca DNS'
+          },
+          zone: { type: 'string', description: 'Nome da zona/dominio (obrigatorio para records, search, nested_subdomains, alias_check)' },
+          domain: { type: 'string', description: 'Nome do dominio (obrigatorio para mx_records)' },
+          name: { type: 'string', description: 'Nome do registro a buscar (obrigatorio para search e alias_check)' },
+          record_type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'], description: 'Filtrar por tipo de registro (records)' },
+          name_filter: { type: 'string', description: 'Filtrar por nome de registro (substring, records)' },
+          max_records: { type: 'integer', default: 25, description: 'Limite de registros retornados (default: 25, max: 100)' },
+          include_stats: { type: 'boolean', default: false, description: 'Incluir estatisticas de subdominios (records)' },
           type: {
             type: 'array',
             items: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'] },
-            description: 'Tipos de registro a buscar (default: ["A", "AAAA"])'
+            description: 'Tipos de registro a buscar (search, default: ["A", "AAAA"])'
           },
           match_mode: {
             type: 'string',
             enum: ['exact', 'contains', 'startsWith'],
-            description: 'Modo de correspondencia do nome. Valores aceitos: exact (correspondencia exata, padrao), contains (contem substring), startsWith (inicia com o texto informado)'
+            description: 'Modo de correspondencia (search): exact, contains, startsWith'
           }
         },
-        required: ['zone', 'name']
-      }
+        required: ['searchType'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_create_dns_record',
-      description: 'Registro DNS novo, entrada e apontamento em zona do WHM/cPanel — cria registros A, AAAA, CNAME, MX, TXT, NS ou PTR. Use no WHM para configurar apontamentos de dominio. Campos obrigatorios variam por tipo: address para A/AAAA, cname para CNAME, exchange para MX. Retorna confirmacao com linha criada no cPanel.',
+      name: 'whm_cpanel_manage_dns_zone_records',
+      description: 'Registros DNS no WHM/cPanel — criar, atualizar, deletar registros e resetar zona. create suporta A, AAAA, CNAME, MX, TXT, NS, PTR. update requer linha obtida via search. delete e reset_zone sao destrutivos e requerem confirmationToken. create_mx adiciona registro MX com prioridade. Retorna Markdown do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR'], description: 'Tipo do registro' },
-          name: { type: 'string', description: 'Nome do registro (ex: www, @, mail)' },
+          action: {
+            type: 'string',
+            enum: ['create', 'update', 'delete', 'reset_zone', 'create_mx'],
+            description: 'Acao: create, update, delete, reset_zone, create_mx'
+          },
+          zone: { type: 'string', description: 'Nome da zona/dominio (obrigatorio para create, update, delete, reset_zone)' },
+          domain: { type: 'string', description: 'Nome do dominio (obrigatorio para create_mx)' },
+          type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR'], description: 'Tipo do registro (obrigatorio para create)' },
+          name: { type: 'string', description: 'Nome do registro (obrigatorio para create)' },
+          line: { type: 'integer', description: 'Numero da linha (obrigatorio para update e delete)' },
+          expected_content: { type: 'string', description: 'Conteudo esperado para verificacao (update/delete, previne edicao concorrente)' },
           address: { type: 'string', description: 'IP para registros A/AAAA' },
-          cname: { type: 'string', description: 'Target para CNAME (ex: outro.dominio.com.)' },
-          exchange: { type: 'string', description: 'Servidor de email para MX' },
+          cname: { type: 'string', description: 'Target para CNAME' },
+          exchange: { type: 'string', description: 'Servidor de email para MX/create_mx' },
           preference: { type: 'integer', description: 'Prioridade MX (menor = maior prioridade)' },
-          txtdata: { type: 'string', description: 'Conteudo para registro TXT (SPF, DKIM, verificacao, etc)' },
+          priority: { type: 'integer', default: 10, description: 'Prioridade MX para create_mx (default: 10)' },
+          txtdata: { type: 'string', description: 'Conteudo para registro TXT' },
           nsdname: { type: 'string', description: 'Nameserver para NS' },
-          ptrdname: { type: 'string', description: 'Hostname para PTR (reverso)' },
-          ttl: { type: 'integer', default: 14400, description: 'TTL em segundos (default: 14400 = 4 horas)' }
-        },
-        required: ['zone', 'type', 'name']
-      }
-    },
-    {
-      name: 'whm_cpanel_update_dns_record',
-      description: 'Edicao de registro DNS, alteracao de IP ou conteudo em zona do WHM/cPanel — atualizacao com optimistic locking. Use no WHM quando precisar alterar IP, TTL ou dados de registro existente. Requer linha obtida via whm_cpanel_search_dns_record. Campo expected_content previne edicao concorrente no servidor WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          line: { type: 'integer', description: 'Numero da linha do registro (obter via whm_cpanel_search_dns_record)' },
-          expected_content: { type: 'string', description: 'Conteudo esperado para verificacao (previne edicao de registro errado)' },
-          address: { type: 'string', description: 'Novo IP para A/AAAA' },
-          cname: { type: 'string', description: 'Novo target para CNAME' },
-          exchange: { type: 'string', description: 'Novo servidor MX' },
-          preference: { type: 'integer', description: 'Nova prioridade MX' },
-          txtdata: { type: 'string', description: 'Novo conteudo TXT' },
-          ttl: { type: 'integer', description: 'Novo TTL' },
+          ptrdname: { type: 'string', description: 'Hostname para PTR' },
+          ttl: { type: 'integer', default: 14400, description: 'TTL em segundos (default: 14400)' },
+          always_accept: { type: 'boolean', default: false, description: 'Aceitar email sem conta local (create_mx)' },
           confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da edicao (auditoria)' }
+          reason: { type: 'string', description: 'Motivo da operacao (auditoria)' }
         },
-        required: ['zone', 'line']
-      }
-    },
-    {
-      name: 'whm_cpanel_delete_dns_record',
-      description: 'Remocao de registro DNS, exclusao de entrada em zona do WHM/cPanel — operacao destrutiva que afeta servicos dependentes. Use no WHM apenas com certeza que o registro nao e necessario. Execute whm_cpanel_search_dns_record antes para obter linha. Requer confirmationToken e motivo para auditoria no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          line: { type: 'integer', description: 'Numero da linha do registro (obter via whm_cpanel_search_dns_record)' },
-          expected_content: { type: 'string', description: 'Conteudo esperado para verificacao (previne delecao de registro errado)' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da remocao (auditoria)' }
-        },
-        required: ['zone', 'line']
-      }
-    },
-    {
-      name: 'whm_cpanel_reset_dns_zone',
-      description: 'Reset de zona DNS, restauracao e limpeza de registros no WHM/cPanel — reverte zona ao estado padrao removendo customizacoes. Use no WHM apenas em ultimo recurso quando zona estiver corrompida ou inconsistente. Operacao destrutiva. Requer confirmationToken e motivo detalhado para auditoria no servidor WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo do reset (auditoria)' }
-        },
-        required: ['zone']
-      }
-    },
-    {
-      name: 'whm_cpanel_list_dns_mx_records',
-      description: 'Registros MX, servidores de email e entrega no WHM/cPanel — listagem de configuracao de recebimento de mensagens. Use no WHM quando precisar verificar roteamento de email ou diagnosticar problemas de recebimento de um dominio. Retorna lista de servidores MX com prioridades. Consulta somente leitura no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do dominio' }
-        },
-        required: ['domain']
-      }
-    },
-    {
-      name: 'whm_cpanel_create_dns_mx_record',
-      description: 'Registro MX novo, servidor de email e prioridade no WHM/cPanel — adiciona entrada de roteamento de email de forma idempotente. Use no WHM quando precisar configurar servidor de email ou MX backup. Verifica duplicatas antes de criar. Retorna confirmacao. Prioridade padrao 10 (menor = maior prioridade) no cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          domain: { type: 'string', description: 'Nome do dominio' },
-          exchange: { type: 'string', description: 'Servidor de email (ex: mail.exemplo.com)' },
-          priority: { type: 'integer', default: 10, description: 'Prioridade MX (menor = maior prioridade). Default: 10' },
-          always_accept: { type: 'boolean', default: false, description: 'Define se o servidor deve sempre aceitar email para este MX, mesmo sem conta local configurada' }
-        },
-        required: ['domain', 'exchange']
-      }
-    },
-    {
-      name: 'whm_cpanel_check_dns_alias_available',
-      description: 'Disponibilidade de registro DNS, alias e nome na zona do WHM/cPanel — verifica se nome esta livre para uso. Use no WHM antes de criar novo registro para prevenir conflitos. Retorna status de disponibilidade. Consulta somente leitura essencial para validar nomes em zonas DNS no servidor WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          zone: { type: 'string', description: 'Nome da zona/dominio' },
-          name: { type: 'string', description: 'Nome do registro a verificar' }
-        },
-        required: ['zone', 'name']
-      }
+        required: ['action'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     },
 
     // ==========================================
-    // SYSTEM TOOLS - Gerenciamento do Servidor
+    // SISTEMA - manage_system
     // ==========================================
     {
-      name: 'whm_cpanel_restart_system_service',
-      description: 'Reinicio de servico via SSH, daemon e processo no WHM/cPanel — reinicializacao por conexao direta ao servidor. Causa indisponibilidade temporaria. Use no WHM para reiniciar httpd, mysql, named, exim, nginx ou pure-ftpd. Diferente de whm_cpanel_restart_service que usa API. Requer confirmationToken no WHM.',
+      name: 'whm_cpanel_manage_system_services',
+      description: 'Sistema e processos do servidor WHM/cPanel via SSH — reiniciar servicos, consultar carga e ler logs. restart_service reinicia daemon via SSH. get_load retorna CPU, memoria e disco em tempo real. read_logs le ultimas linhas de /var/log/*, /usr/local/apache/logs/*, /usr/local/cpanel/logs/*. Retorna Markdown do WHM.',
       inputSchema: {
         type: 'object',
         properties: {
+          action: {
+            type: 'string',
+            enum: ['restart_service', 'get_load', 'read_logs'],
+            description: 'Acao: restart_service, get_load (metricas CPU/RAM/disco), read_logs (ultimas linhas)'
+          },
           service: {
             type: 'string',
             enum: ['httpd', 'mysql', 'named', 'postfix', 'dovecot', 'exim', 'nginx', 'pure-ftpd'],
-            description: 'Servico a reiniciar'
+            description: 'Servico a reiniciar (obrigatorio para restart_service)'
           },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo do restart (auditoria)' }
+          log_file: { type: 'string', description: 'Caminho absoluto do log (obrigatorio para read_logs). Permitidos: /var/log/*, /usr/local/apache/logs/*, /usr/local/cpanel/logs/*' },
+          lines: { type: 'integer', default: 30, description: 'Numero de linhas do log (default: 30, max: 100)' },
+          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN, obrigatorio para restart_service)' },
+          reason: { type: 'string', description: 'Motivo (auditoria, obrigatorio para restart_service)' }
         },
-        required: ['service']
-      }
-    },
-    {
-      name: 'whm_cpanel_get_system_load_metrics',
-      description: 'Metricas de carga, CPU e memoria do servidor WHM/cPanel — monitoramento de recursos via SSH em tempo real. Use no WHM quando precisar diagnosticar lentidao ou monitorar performance do servidor. Retorna load average de 1, 5 e 15 minutos, memoria RAM livre e espaco em disco disponivel no WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-        required: []
-      }
-    },
-    {
-      name: 'whm_cpanel_read_system_log_lines',
-      description: 'Logs do sistema, registros de erro e diagnostico no WHM/cPanel — leitura das ultimas linhas via SSH. Use no WHM quando precisar verificar erros recentes ou analisar logs de servico. Retorna ultimas N linhas. Caminhos permitidos: /var/log/*, /usr/local/apache/logs/*, /usr/local/cpanel/logs/*. Padrao: 50 no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          log_file: { type: 'string', description: 'Caminho absoluto do arquivo de log. Caminhos permitidos: /var/log/*, /usr/local/apache/logs/*, /usr/local/cpanel/logs/*' },
-          lines: { type: 'integer', default: 50, description: 'Numero de linhas a retornar (default: 50)' }
-        },
-        required: ['log_file']
-      }
+        required: ['action'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true }
     },
 
     // ==========================================
-    // FILE TOOLS - Gerenciamento de Arquivos
+    // ARQUIVOS - search_files / manage_files
     // ==========================================
     {
-      name: 'whm_cpanel_list_user_files',
-      description: 'Arquivos, diretorios e documentos de conta cPanel no WHM — navegacao na estrutura do home do usuario. Use no WHM quando precisar explorar arquivos de um cliente ou localizar configuracoes. Restrito a /home/{usuario} por seguranca do WHM. Retorna listagem com nomes, tamanhos e datas de modificacao.',
+      name: 'whm_cpanel_search_account_files',
+      description: 'Arquivos e diretorios de conta cPanel no WHM — navegacao e leitura do home do usuario. searchType list para explorar estrutura de diretorios, read para visualizar conteudo de arquivo. Restrito a /home/{usuario} por seguranca contra path traversal. Retorna Markdown com listagem ou conteudo do arquivo no WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          cpanel_user: { type: 'string', description: 'Usuario cPanel (dono dos arquivos)' },
-          path: { type: 'string', description: 'Caminho relativo ao home do usuario (ex: public_html, public_html/images). Default: raiz do home' }
+          searchType: {
+            type: 'string',
+            enum: ['list', 'read'],
+            description: 'Tipo de busca: list (listar diretorios), read (ler conteudo de arquivo)'
+          },
+          cpanel_user: { type: 'string', description: 'Usuario cPanel (dono dos arquivos, obrigatorio)' },
+          path: { type: 'string', description: 'Caminho relativo ao home (ex: public_html, public_html/index.php). Para list: diretorio; para read: arquivo' }
         },
-        required: ['cpanel_user']
-      }
+        required: ['searchType', 'cpanel_user'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
     },
     {
-      name: 'whm_cpanel_read_user_file',
-      description: 'Conteudo de arquivo, codigo e configuracao de conta cPanel no WHM — leitura de documentos do home do usuario. Use no WHM quando precisar visualizar .htaccess, index.php ou diagnosticar problemas em arquivos do cliente. Restrito a /home/{usuario} por seguranca contra path traversal. Consulta somente leitura no WHM.',
+      name: 'whm_cpanel_manage_account_files',
+      description: 'Escrita e remocao de arquivos de conta cPanel no WHM — criar, atualizar ou deletar conteudo no home do usuario. write cria ou sobrescreve com backup automatico. delete remove permanentemente. Restrito a /home/{usuario} por seguranca. Requer confirmationToken. Retorna Markdown com resultado da operacao no WHM.',
       inputSchema: {
         type: 'object',
         properties: {
-          cpanel_user: { type: 'string', description: 'Usuario cPanel (dono do arquivo)' },
-          path: { type: 'string', description: 'Caminho do arquivo relativo ao home (ex: public_html/index.php)' }
-        },
-        required: ['cpanel_user', 'path']
-      }
-    },
-    {
-      name: 'whm_cpanel_write_user_file',
-      description: 'Escrita de arquivo, configuracao e documento em conta cPanel no WHM — cria ou atualiza conteudo no home do usuario. Use no WHM quando precisar editar .htaccess, wp-config ou configuracoes do cliente. Backup automatico antes de sobrescrever. Requer confirmationToken. Restrito a /home/{usuario} no WHM.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          cpanel_user: { type: 'string', description: 'Usuario cPanel' },
-          path: { type: 'string', description: 'Caminho do arquivo' },
-          content: { type: 'string', description: 'Conteudo a escrever' },
-          encoding: { type: 'string', default: 'utf8', description: 'Encoding do arquivo (default: utf8)' },
-          create_dirs: { type: 'boolean', default: false, description: 'Criar diretorios pais se nao existirem' },
+          action: {
+            type: 'string',
+            enum: ['write', 'delete'],
+            description: 'Acao: write (criar/atualizar arquivo), delete (remover arquivo)'
+          },
+          cpanel_user: { type: 'string', description: 'Usuario cPanel (obrigatorio)' },
+          path: { type: 'string', description: 'Caminho do arquivo relativo ao home (obrigatorio)' },
+          content: { type: 'string', description: 'Conteudo a escrever (obrigatorio para write)' },
+          encoding: { type: 'string', default: 'utf8', description: 'Encoding do arquivo (default: utf8, para write)' },
+          create_dirs: { type: 'boolean', default: false, description: 'Criar diretorios pais se nao existirem (write)' },
+          force: { type: 'boolean', default: false, description: 'Forcar delecao sem confirmacao adicional (delete)' },
           confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da escrita (auditoria)' }
+          reason: { type: 'string', description: 'Motivo da operacao (auditoria)' }
         },
-        required: ['cpanel_user', 'path', 'content']
-      }
-    },
-    {
-      name: 'whm_cpanel_delete_user_file',
-      description: 'Remocao de arquivo, documento e conteudo de conta cPanel no WHM — delecao permanente no home do usuario. Use no WHM apenas quando tiver certeza que o arquivo nao e necessario. Operacao destrutiva e irreversivel. Restrito a /home/{usuario} por seguranca. Requer confirmationToken e motivo no WHM/cPanel.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          cpanel_user: { type: 'string', description: 'Usuario cPanel' },
-          path: { type: 'string', description: 'Caminho do arquivo a deletar' },
-          force: { type: 'boolean', default: false, description: 'Forcar delecao sem confirmacao adicional' },
-          confirmationToken: { type: 'string', description: 'Token de confirmacao (MCP_SAFETY_TOKEN)' },
-          reason: { type: 'string', description: 'Motivo da delecao (auditoria)' }
-        },
-        required: ['cpanel_user', 'path']
-      }
+        required: ['action', 'cpanel_user', 'path'],
+        additionalProperties: false
+      },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true }
     }
   ];
 }
+
+// SPEC-WHM-ENHANCE-001 / F08 - Bridge tools adicionados ao toolDefinitions
+const bridgeToolDefs = [
+  {
+    name: 'whm_cpanel_list_server_resources',
+    description: 'Recursos MCP, dados estaticos e configuracao da maquina WHM/cPanel — lista URIs disponiveis (whm://server/config, whm://server/status). Use para descobrir contexto e metadados do servidor WHM. Retorna Markdown com nome, URI e descricao de cada recurso.',
+    inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  },
+  {
+    name: 'whm_cpanel_read_server_resource',
+    description: 'Recurso MCP, dados e contexto da instancia WHM/cPanel — acessa URI whm://server/config (configuracao, hostname, versao) ou whm://server/status (carga, uptime, servicos). Use para obter informacoes do servidor WHM. Retorna Markdown com dados atualizados.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        uri: { type: 'string', enum: ['whm://server/config', 'whm://server/status'], description: 'URI do resource MCP (ex: whm://server/config)' }
+      },
+      required: ['uri'],
+      additionalProperties: false
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+  },
+  {
+    name: 'whm_cpanel_list_server_prompts',
+    description: 'Prompts e relatorios automatizados do servidor WHM/cPanel — lista 15 workflows disponiveis (7 gestor + 8 analista), incluindo saude de contas, DNS, SSL e backup. Use para descobrir analises disponiveis no WHM. Retorna Markdown com nome e descricao de cada prompt.',
+    inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
+  },
+  {
+    name: 'whm_cpanel_get_analysis_prompt',
+    description: 'Relatorio e analise da infraestrutura WHM/cPanel — executa prompt por nome com argumentos opcionais. Gera diagnosticos de saude, DNS, SSL, backup e seguranca do servidor WHM. Use para obter relatorios detalhados de hospedagem. Retorna Markdown formatado.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', enum: ['whm_account_health_summary', 'whm_resource_usage_trends', 'whm_security_posture', 'whm_ssl_certificate_inventory', 'whm_backup_coverage', 'whm_dns_zone_health', 'whm_email_deliverability', 'whm_account_quick_lookup', 'whm_dns_troubleshooting', 'whm_email_setup_guide', 'whm_ssl_installation_guide', 'whm_website_down_investigation', 'whm_disk_usage_alert', 'whm_domain_migration_checklist', 'whm_backup_restore_guide'], description: 'Nome do prompt WHM a executar' },
+        arguments: { type: 'object', description: 'Argumentos do prompt (opcionais)', additionalProperties: true }
+      },
+      required: ['name'],
+      additionalProperties: false
+    },
+    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
+  }
+];
+
+// Carregar tools: 16 consolidadas (com annotations inline) + 4 bridge = 20 tools
+const toolDefinitions = [...buildToolDefinitions(), ...bridgeToolDefs];
 
 class MCPHandler {
   constructor() {
@@ -803,20 +573,22 @@ class MCPHandler {
       // Rotear para handler apropriado
       switch (method) {
         case 'initialize':
-          // MCP Protocol initialization handshake (obrigatório para Claude Code)
+          // SPEC-WHM-ENHANCE-001 / F05, F07, F11
           return {
             jsonrpc: '2.0',
             id,
             result: {
-              protocolVersion: '2024-11-05',
+              protocolVersion: '2025-11-25',
               serverInfo: {
                 name: 'mcp-whm-cpanel',
-                version: '1.0.0'
+                version: '2.0.0'
               },
               capabilities: {
                 tools: {},
-                prompts: {}
-              }
+                prompts: {},
+                resources: {}
+              },
+              instructions: WHM_INSTRUCTIONS
             }
           };
 
@@ -831,6 +603,12 @@ class MCPHandler {
 
         case 'prompts/get':
           return await this.handlePromptGet(id, params);
+
+        case 'resources/list':
+          return { jsonrpc: '2.0', id, result: { resources: listResources() } };
+
+        case 'resources/read':
+          return await this.handleResourceRead(id, params);
 
         case 'notifications/initialized':
         case 'initialized':
@@ -922,10 +700,17 @@ class MCPHandler {
    * Executa tool especifica
    */
   async handleToolCall(id, params) {
-    const { name, arguments: args } = params || {};
+    let { name, arguments: args } = params || {};
 
     if (!name) {
       return this.errorResponse(id, -32602, 'Invalid params', { reason: 'Tool name required' });
+    }
+
+    // SPEC-WHM-ENHANCE-001 / F06: Backward compatibility via TOOL_ALIASES
+    if (TOOL_ALIASES[name]) {
+      const newName = TOOL_ALIASES[name];
+      logger.warn(`[DEPRECATION] Tool "${name}" foi renomeada para "${newName}". Atualize suas automacoes.`);
+      name = newName;
     }
 
     // Verificar se tool existe
@@ -945,7 +730,9 @@ class MCPHandler {
     try {
       const result = await executor();
 
-      // MCP Protocol 2024-11-05: tools/call deve retornar content array
+      // SPEC-WHM-ENHANCE-001 / F01: Interceptor Markdown centralizado
+      // Substitui JSON.stringify por formatToolResponse() com fallback chain
+      // FIX [G2]: Fallback identico ao Hudu (server.ts:385-390)
       return {
         jsonrpc: '2.0',
         id,
@@ -953,7 +740,7 @@ class MCPHandler {
           content: [
             {
               type: 'text',
-              text: JSON.stringify(result, null, 2)
+              text: formatToolResponse(name, result, args) || result?.message || 'Operacao realizada com sucesso.'
             }
           ]
         }
@@ -973,7 +760,8 @@ class MCPHandler {
   }
 
   /**
-   * Executa tool pelo nome
+   * Executa tool pelo nome (consolidado)
+   * SPEC-WHM-ENHANCE-001 / F06: Routing por tool consolidada → service method
    * Correções aplicadas:
    * - GAP-IMP-02: Enriquecer args com token de header se não fornecido no body
    */
@@ -1010,13 +798,15 @@ class MCPHandler {
         return await this.executeSshTool(name, enrichedArgs);
       case 'file':
         return await this.executeFileTool(name, enrichedArgs);
+      case 'bridge':
+        return await this.executeBridgeTool(name, enrichedArgs);
       default:
         throw new Error(`Unknown tool category for: ${name}`);
     }
   }
 
   /**
-   * Executa tools WHM
+   * Executa tools WHM consolidadas (search_accounts, manage_accounts, search_server, manage_server)
    */
   async executeWhmTool(name, args) {
     if (!this.whmService) {
@@ -1024,81 +814,120 @@ class MCPHandler {
     }
 
     switch (name) {
-      case 'whm_cpanel_list_accounts':
-        return await withOperationTimeout(async () => {
-          const result = await this.whmService.listAccounts();
-          // result = {success: true, data: {acct: [...]}}
-          const accounts = result?.data?.acct || [];
-          return {
-            success: true,
-            data: {
-              accounts: accounts,
-              total: accounts.length
-            }
-          };
-        }, 'whm_cpanel_list_accounts');
+      case 'whm_cpanel_search_hosting_accounts': {
+        const searchType = args.searchType || 'list';
+        switch (searchType) {
+          case 'list':
+            return await withOperationTimeout(async () => {
+              const result = await this.whmService.listAccounts();
+              const accounts = result?.data?.acct || [];
+              return {
+                success: true,
+                data: {
+                  accounts: accounts,
+                  total: accounts.length
+                }
+              };
+            }, 'whm_cpanel_search_hosting_accounts');
 
-      case 'whm_cpanel_create_account':
-        SafetyGuard.requireConfirmation('whm_cpanel_create_account', args);
-        return await withOperationTimeout(
-          () => this.whmService.createAccount(args),
-          'whm_cpanel_create_account'
-        );
+          case 'summary':
+            if (!args.username) throw new Error('username obrigatorio para searchType=summary');
+            return await withOperationTimeout(
+              () => this.whmService.getAccountSummary(args.username),
+              'whm_cpanel_search_hosting_accounts'
+            );
 
-      case 'whm_cpanel_suspend_account':
-        SafetyGuard.requireConfirmation('whm_cpanel_suspend_account', args);
-        return await withOperationTimeout(
-          () => this.whmService.suspendAccount(args.username, args.reason),
-          'whm_cpanel_suspend_account'
-        );
+          case 'domains':
+            if (!args.username) throw new Error('username obrigatorio para searchType=domains');
+            return await withOperationTimeout(
+              () => this.whmService.listDomains(args.username),
+              'whm_cpanel_search_hosting_accounts'
+            );
 
-      case 'whm_cpanel_unsuspend_account':
-        SafetyGuard.requireConfirmation('whm_cpanel_unsuspend_account', args);
-        return await withOperationTimeout(
-          () => this.whmService.unsuspendAccount(args.username),
-          'whm_cpanel_unsuspend_account'
-        );
-
-      case 'whm_cpanel_delete_account':
-        if (!args.confirm) {
-          throw new Error('Confirmation required to terminate account');
+          default:
+            throw new Error(`searchType invalido: ${searchType}. Valores aceitos: list, summary, domains`);
         }
-        SafetyGuard.requireConfirmation('whm_cpanel_delete_account', args);
-        return await withOperationTimeout(
-          () => this.whmService.terminateAccount(args.username),
-          'whm_cpanel_delete_account'
-        );
+      }
 
-      case 'whm_cpanel_get_account_summary':
-        return await withOperationTimeout(
-          () => this.whmService.getAccountSummary(args.username),
-          'whm_cpanel_get_account_summary'
-        );
+      case 'whm_cpanel_manage_hosting_accounts': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_accounts');
 
-      case 'whm_cpanel_get_server_status':
-        return await withOperationTimeout(
-          () => this.whmService.getServerStatus(),
-          'whm_cpanel_get_server_status'
-        );
+        switch (action) {
+          case 'create':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosting_accounts', args);
+            return await withOperationTimeout(
+              () => this.whmService.createAccount(args),
+              'whm_cpanel_manage_hosting_accounts'
+            );
 
-      case 'whm_cpanel_get_services_status':
-        return await withOperationTimeout(
-          () => this.whmService.getServiceStatus(),
-          'whm_cpanel_get_services_status'
-        );
+          case 'suspend':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosting_accounts', args);
+            return await withOperationTimeout(
+              () => this.whmService.suspendAccount(args.username, args.reason),
+              'whm_cpanel_manage_hosting_accounts'
+            );
 
-      case 'whm_cpanel_restart_service':
-        SafetyGuard.requireConfirmation('whm_cpanel_restart_service', args);
-        return await withOperationTimeout(
-          () => this.whmService.restartService(args.service),
-          'whm_cpanel_restart_service'
-        );
+          case 'unsuspend':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosting_accounts', args);
+            return await withOperationTimeout(
+              () => this.whmService.unsuspendAccount(args.username),
+              'whm_cpanel_manage_hosting_accounts'
+            );
 
-      case 'whm_cpanel_list_account_domains':
-        return await withOperationTimeout(
-          () => this.whmService.listDomains(args.username),
-          'whm_cpanel_list_account_domains'
-        );
+          case 'delete':
+            if (!args.confirm) {
+              throw new Error('Confirmation required to terminate account');
+            }
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosting_accounts', args);
+            return await withOperationTimeout(
+              () => this.whmService.terminateAccount(args.username),
+              'whm_cpanel_manage_hosting_accounts'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: create, suspend, unsuspend, delete`);
+        }
+      }
+
+      case 'whm_cpanel_search_server_status': {
+        const type = args.type;
+        if (!type) throw new Error('type obrigatorio para search_server');
+
+        switch (type) {
+          case 'status':
+            return await withOperationTimeout(
+              () => this.whmService.getServerStatus(),
+              'whm_cpanel_search_server_status'
+            );
+
+          case 'services':
+            return await withOperationTimeout(
+              () => this.whmService.getServiceStatus(),
+              'whm_cpanel_search_server_status'
+            );
+
+          default:
+            throw new Error(`type invalido: ${type}. Valores aceitos: status, services`);
+        }
+      }
+
+      case 'whm_cpanel_manage_server_service': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_server');
+
+        switch (action) {
+          case 'restart_service':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_server_service', args);
+            return await withOperationTimeout(
+              () => this.whmService.restartService(args.service),
+              'whm_cpanel_manage_server_service'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: restart_service`);
+        }
+      }
 
       default:
         throw new Error(`Unknown WHM tool: ${name}`);
@@ -1106,7 +935,7 @@ class MCPHandler {
   }
 
   /**
-   * Executa tools de gerenciamento de domínios (Phase 1)
+   * Executa tools de gerenciamento de domínios consolidadas (search_domains, manage_domains, manage_dnssec)
    */
   async executeDomainTool(name, args) {
     if (!this.whmService) {
@@ -1114,146 +943,183 @@ class MCPHandler {
     }
 
     switch (name) {
-      case 'whm_cpanel_get_domain_data':
-        return await withOperationTimeout(
-          () => this.whmService.getDomainUserData(args.domain),
-          'whm_cpanel_get_domain_data'
-        );
+      case 'whm_cpanel_search_hosted_domains': {
+        const searchType = args.searchType;
+        if (!searchType) throw new Error('searchType obrigatorio para search_domains');
 
-      case 'whm_cpanel_list_all_domains':
-        return await withOperationTimeout(
-          () => this.whmService.getAllDomainInfo(args.limit, args.offset, args.filter, args.domain_filter),
-          'whm_cpanel_list_all_domains'
-        );
+        switch (searchType) {
+          case 'all':
+            return await withOperationTimeout(
+              () => this.whmService.getAllDomainInfo(args.limit, args.offset, args.filter, args.domain_filter),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      case 'whm_cpanel_get_domain_owner':
-        return await withOperationTimeout(
-          () => this.whmService.getDomainOwner(args.domain),
-          'whm_cpanel_get_domain_owner'
-        );
+          case 'data':
+            if (!args.domain) throw new Error('domain obrigatorio para searchType=data');
+            return await withOperationTimeout(
+              () => this.whmService.getDomainUserData(args.domain),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      case 'whm_cpanel_create_domain_alias':
-        return await withOperationTimeout(
-          () => this.whmService.createParkedDomain(
-            args.domain,
-            args.username,
-            args.target_domain
-          ),
-          'whm_cpanel_create_domain_alias'
-        );
+          case 'owner':
+            if (!args.domain) throw new Error('domain obrigatorio para searchType=owner');
+            return await withOperationTimeout(
+              () => this.whmService.getDomainOwner(args.domain),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      case 'whm_cpanel_create_subdomain':
-        return await withOperationTimeout(
-          () => this.whmService.createSubdomain(
-            args.subdomain,
-            args.domain,
-            args.username,
-            args.document_root
-          ),
-          'whm_cpanel_create_subdomain'
-        );
+          case 'addons':
+            if (!args.username) throw new Error('username obrigatorio para searchType=addons');
+            return await withOperationTimeout(
+              () => this.whmService.listAddonDomains(args.username),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      case 'whm_cpanel_delete_domain':
-        SafetyGuard.requireConfirmation('whm_cpanel_delete_domain', args);
-        return await withOperationTimeout(
-          () => this.whmService.deleteDomain(
-            args.domain,
-            args.username,
-            args.type,
-            true // confirmed=true because SafetyGuard already validated
-          ),
-          'whm_cpanel_delete_domain'
-        );
+          case 'addon_details':
+            if (!args.domain || !args.username) throw new Error('domain e username obrigatorios para searchType=addon_details');
+            return await withOperationTimeout(
+              () => this.whmService.getAddonDomainDetails(args.domain, args.username),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      case 'whm_cpanel_resolve_domain_ip':
-        return await withOperationTimeout(
-          () => this.whmService.resolveDomainName(args.domain),
-          'whm_cpanel_resolve_domain_ip'
-        );
+          case 'authority':
+            if (!args.domain) throw new Error('domain obrigatorio para searchType=authority');
+            return await withOperationTimeout(
+              () => this.whmService.hasLocalAuthority(args.domain),
+              'whm_cpanel_search_hosted_domains'
+            );
 
-      // Addon Domain Tools (Phase 2)
-      case 'whm_cpanel_list_addon_domains':
-        return await withOperationTimeout(
-          () => this.whmService.listAddonDomains(args.username),
-          'whm_cpanel_list_addon_domains'
-        );
+          default:
+            throw new Error(`searchType invalido: ${searchType}. Valores aceitos: all, data, owner, addons, addon_details, authority`);
+        }
+      }
 
-      case 'whm_cpanel_get_addon_domain_details':
-        return await withOperationTimeout(
-          () => this.whmService.getAddonDomainDetails(args.domain, args.username),
-          'whm_cpanel_get_addon_domain_details'
-        );
+      case 'whm_cpanel_manage_hosted_domains': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_domains');
 
-      case 'whm_cpanel_get_addon_conversion_status':
-        return await withOperationTimeout(
-          () => this.whmService.getConversionStatus(args.conversion_id),
-          'whm_cpanel_get_addon_conversion_status'
-        );
+        switch (action) {
+          case 'create_alias':
+            return await withOperationTimeout(
+              () => this.whmService.createParkedDomain(
+                args.domain,
+                args.username,
+                args.target_domain
+              ),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_create_addon_conversion':
-        SafetyGuard.requireConfirmation('whm_cpanel_create_addon_conversion', args);
-        return await withOperationTimeout(
-          () => this.whmService.initiateAddonConversion(args),
-          'whm_cpanel_create_addon_conversion'
-        );
+          case 'create_subdomain':
+            return await withOperationTimeout(
+              () => this.whmService.createSubdomain(
+                args.subdomain,
+                args.domain,
+                args.username,
+                args.document_root
+              ),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_get_addon_conversion_details':
-        return await withOperationTimeout(
-          () => this.whmService.getConversionDetails(args.conversion_id),
-          'whm_cpanel_get_addon_conversion_details'
-        );
+          case 'delete':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosted_domains', args);
+            return await withOperationTimeout(
+              () => this.whmService.deleteDomain(
+                args.domain,
+                args.username,
+                args.type,
+                true // confirmed=true because SafetyGuard already validated
+              ),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_list_addon_conversions':
-        return await withOperationTimeout(
-          () => this.whmService.listConversions(),
-          'whm_cpanel_list_addon_conversions'
-        );
+          case 'resolve_ip':
+            return await withOperationTimeout(
+              () => this.whmService.resolveDomainName(args.domain),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      // Domain Authority and DNSSEC Tools (Phase 2)
-      case 'whm_cpanel_check_domain_authority':
-        return await withOperationTimeout(
-          () => this.whmService.hasLocalAuthority(args.domain),
-          'whm_cpanel_check_domain_authority'
-        );
+          case 'get_conversion_status':
+            return await withOperationTimeout(
+              () => this.whmService.getConversionStatus(args.conversion_id),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_get_dnssec_ds_records':
-        return await withOperationTimeout(
-          () => this.whmService.getDSRecords(args.domains),
-          'whm_cpanel_get_dnssec_ds_records'
-        );
+          case 'create_conversion':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosted_domains', args);
+            return await withOperationTimeout(
+              () => this.whmService.initiateAddonConversion(args),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_enable_dnssec_nsec3':
-        SafetyGuard.requireConfirmation('whm_cpanel_enable_dnssec_nsec3', args);
-        // Dynamic timeout: 60s + (30s * num_domains), max 600s
-        const enableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
-        return await withOperationTimeout(
-          () => this.whmService.setNSEC3ForDomains(args.domains),
-          'whm_cpanel_enable_dnssec_nsec3',
-          enableTimeout
-        );
+          case 'get_conversion_details':
+            return await withOperationTimeout(
+              () => this.whmService.getConversionDetails(args.conversion_id),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_disable_dnssec_nsec3':
-        SafetyGuard.requireConfirmation('whm_cpanel_disable_dnssec_nsec3', args);
-        // Dynamic timeout: 60s + (30s * num_domains), max 600s
-        const disableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
-        return await withOperationTimeout(
-          () => this.whmService.unsetNSEC3ForDomains(args.domains),
-          'whm_cpanel_disable_dnssec_nsec3',
-          disableTimeout
-        );
+          case 'list_conversions':
+            return await withOperationTimeout(
+              () => this.whmService.listConversions(),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_get_nsec3_operation_status':
-        return await withOperationTimeout(
-          () => this.whmService.getNsec3Status(args.operation_id),
-          'whm_cpanel_get_nsec3_operation_status'
-        );
+          case 'update_cache':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_hosted_domains', args);
+            return await withOperationTimeout(
+              () => this.whmService.updateUserdomains(),
+              'whm_cpanel_manage_hosted_domains'
+            );
 
-      case 'whm_cpanel_update_userdomains_cache':
-        SafetyGuard.requireConfirmation('whm_cpanel_update_userdomains_cache', args);
-        return await withOperationTimeout(
-          () => this.whmService.updateUserdomains(),
-          'whm_cpanel_update_userdomains_cache'
-        );
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: create_alias, create_subdomain, delete, resolve_ip, get_conversion_status, create_conversion, get_conversion_details, list_conversions, update_cache`);
+        }
+      }
+
+      case 'whm_cpanel_manage_dnssec_settings': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_dnssec');
+
+        switch (action) {
+          case 'get_ds_records':
+            return await withOperationTimeout(
+              () => this.whmService.getDSRecords(args.domains),
+              'whm_cpanel_manage_dnssec_settings'
+            );
+
+          case 'enable_nsec3':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_dnssec_settings', args);
+            // Dynamic timeout: 60s + (30s * num_domains), max 600s
+            {
+              const enableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
+              return await withOperationTimeout(
+                () => this.whmService.setNSEC3ForDomains(args.domains),
+                'whm_cpanel_manage_dnssec_settings',
+                enableTimeout
+              );
+            }
+
+          case 'disable_nsec3':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_dnssec_settings', args);
+            // Dynamic timeout: 60s + (30s * num_domains), max 600s
+            {
+              const disableTimeout = Math.min(60000 + (30000 * (args.domains?.length || 1)), 600000);
+              return await withOperationTimeout(
+                () => this.whmService.unsetNSEC3ForDomains(args.domains),
+                'whm_cpanel_manage_dnssec_settings',
+                disableTimeout
+              );
+            }
+
+          case 'get_status':
+            return await withOperationTimeout(
+              () => this.whmService.getNsec3Status(args.operation_id),
+              'whm_cpanel_manage_dnssec_settings'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: get_ds_records, enable_nsec3, disable_nsec3, get_status`);
+        }
+      }
 
       default:
         throw new Error(`Unknown Domain tool: ${name}`);
@@ -1261,7 +1127,7 @@ class MCPHandler {
   }
 
   /**
-   * Executa tools DNS (CC-03, CC-04)
+   * Executa tools DNS consolidadas (search_dns, manage_dns)
    */
   async executeDnsTool(name, args) {
     if (!this.dnsService) {
@@ -1269,110 +1135,135 @@ class MCPHandler {
     }
 
     switch (name) {
-      case 'whm_cpanel_list_dns_zones':
-        return await withOperationTimeout(
-          () => this.dnsService.listZones(),
-          'whm_cpanel_list_dns_zones'
-        );
+      case 'whm_cpanel_search_dns_zone_records': {
+        const searchType = args.searchType;
+        if (!searchType) throw new Error('searchType obrigatorio para search_dns');
 
-      case 'whm_cpanel_get_dns_zone_records':
-        return await withOperationTimeout(
-          () => this.dnsService.getZone(args.zone, {
-            record_type: args.record_type,
-            name_filter: args.name_filter,
-            max_records: args.max_records,
-            include_stats: args.include_stats
-          }),
-          'whm_cpanel_get_dns_zone_records'
-        );
+        switch (searchType) {
+          case 'zones':
+            return await withOperationTimeout(
+              () => this.dnsService.listZones(),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_check_dns_nested_subdomains':
-        return await withOperationTimeout(
-          () => this.dnsService.checkNestedDomains(args.zone),
-          'whm_cpanel_check_dns_nested_subdomains'
-        );
+          case 'records':
+            if (!args.zone) throw new Error('zone obrigatorio para searchType=records');
+            return await withOperationTimeout(
+              () => this.dnsService.getZone(args.zone, {
+                record_type: args.record_type,
+                name_filter: args.name_filter,
+                max_records: args.max_records,
+                include_stats: args.include_stats
+              }),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_search_dns_record':
-        return await withOperationTimeout(
-          () => this.dnsService.searchRecord(
-            args.zone,
-            args.name,
-            args.type || ['A', 'AAAA'],
-            args.match_mode || 'exact'
-          ),
-          'whm_cpanel_search_dns_record'
-        );
+          case 'search':
+            if (!args.zone || !args.name) throw new Error('zone e name obrigatorios para searchType=search');
+            return await withOperationTimeout(
+              () => this.dnsService.searchRecord(
+                args.zone,
+                args.name,
+                args.type || ['A', 'AAAA'],
+                args.match_mode || 'exact'
+              ),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_create_dns_record':
-        return await withOperationTimeout(
-          () => this.dnsService.addRecord(args.zone, args.type, args.name, {
-            address: args.address,
-            cname: args.cname,
-            exchange: args.exchange,
-            preference: args.preference,
-            txtdata: args.txtdata,
-            nsdname: args.nsdname,
-            ptrdname: args.ptrdname,
-            ttl: args.ttl
-          }),
-          'whm_cpanel_create_dns_record'
-        );
+          case 'mx_records':
+            if (!args.domain) throw new Error('domain obrigatorio para searchType=mx_records');
+            return await withOperationTimeout(
+              () => this.whmService.listMXRecords(args.domain),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_update_dns_record':
-        SafetyGuard.requireConfirmation('whm_cpanel_update_dns_record', args);
-        return await withOperationTimeout(
-          () => this.dnsService.editRecord(
-            args.zone,
-            args.line,
-            {
-              address: args.address,
-              cname: args.cname,
-              exchange: args.exchange,
-              preference: args.preference,
-              txtdata: args.txtdata,
-              ttl: args.ttl
-            },
-            args.expected_content
-          ),
-          'whm_cpanel_update_dns_record'
-        );
+          case 'nested_subdomains':
+            if (!args.zone) throw new Error('zone obrigatorio para searchType=nested_subdomains');
+            return await withOperationTimeout(
+              () => this.dnsService.checkNestedDomains(args.zone),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_delete_dns_record':
-        SafetyGuard.requireConfirmation('whm_cpanel_delete_dns_record', args);
-        return await withOperationTimeout(
-          () => this.dnsService.deleteRecord(args.zone, args.line, args.expected_content),
-          'whm_cpanel_delete_dns_record'
-        );
+          case 'alias_check':
+            if (!args.zone || !args.name) throw new Error('zone e name obrigatorios para searchType=alias_check');
+            return await withOperationTimeout(
+              () => this.whmService.isAliasAvailable(args.zone, args.name),
+              'whm_cpanel_search_dns_zone_records'
+            );
 
-      case 'whm_cpanel_reset_dns_zone':
-        SafetyGuard.requireConfirmation('whm_cpanel_reset_dns_zone', args);
-        return await withOperationTimeout(
-          () => this.dnsService.resetZone(args.zone),
-          'whm_cpanel_reset_dns_zone'
-        );
+          default:
+            throw new Error(`searchType invalido: ${searchType}. Valores aceitos: zones, records, search, mx_records, nested_subdomains, alias_check`);
+        }
+      }
 
-      case 'whm_cpanel_list_dns_mx_records':
-        return await withOperationTimeout(
-          () => this.whmService.listMXRecords(args.domain),
-          'whm_cpanel_list_dns_mx_records'
-        );
+      case 'whm_cpanel_manage_dns_zone_records': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_dns');
 
-      case 'whm_cpanel_create_dns_mx_record':
-        return await withOperationTimeout(
-          () => this.whmService.saveMXRecord(
-            args.domain,
-            args.exchange,
-            args.priority,
-            args.always_accept
-          ),
-          'whm_cpanel_create_dns_mx_record'
-        );
+        switch (action) {
+          case 'create':
+            return await withOperationTimeout(
+              () => this.dnsService.addRecord(args.zone, args.type, args.name, {
+                address: args.address,
+                cname: args.cname,
+                exchange: args.exchange,
+                preference: args.preference,
+                txtdata: args.txtdata,
+                nsdname: args.nsdname,
+                ptrdname: args.ptrdname,
+                ttl: args.ttl
+              }),
+              'whm_cpanel_manage_dns_zone_records'
+            );
 
-      case 'whm_cpanel_check_dns_alias_available':
-        return await withOperationTimeout(
-          () => this.whmService.isAliasAvailable(args.zone, args.name),
-          'whm_cpanel_check_dns_alias_available'
-        );
+          case 'update':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            return await withOperationTimeout(
+              () => this.dnsService.editRecord(
+                args.zone,
+                args.line,
+                {
+                  address: args.address,
+                  cname: args.cname,
+                  exchange: args.exchange,
+                  preference: args.preference,
+                  txtdata: args.txtdata,
+                  ttl: args.ttl
+                },
+                args.expected_content
+              ),
+              'whm_cpanel_manage_dns_zone_records'
+            );
+
+          case 'delete':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            return await withOperationTimeout(
+              () => this.dnsService.deleteRecord(args.zone, args.line, args.expected_content),
+              'whm_cpanel_manage_dns_zone_records'
+            );
+
+          case 'reset_zone':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            return await withOperationTimeout(
+              () => this.dnsService.resetZone(args.zone),
+              'whm_cpanel_manage_dns_zone_records'
+            );
+
+          case 'create_mx':
+            return await withOperationTimeout(
+              () => this.whmService.saveMXRecord(
+                args.domain,
+                args.exchange,
+                args.priority,
+                args.always_accept
+              ),
+              'whm_cpanel_manage_dns_zone_records'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: create, update, delete, reset_zone, create_mx`);
+        }
+      }
 
       default:
         throw new Error(`Unknown DNS tool: ${name}`);
@@ -1380,7 +1271,7 @@ class MCPHandler {
   }
 
   /**
-   * Executa tools SSH seguras (CC-02)
+   * Executa tools SSH/System consolidadas (manage_system)
    */
   async executeSshTool(name, args) {
     if (!this.sshManager) {
@@ -1388,24 +1279,35 @@ class MCPHandler {
     }
 
     switch (name) {
-      case 'whm_cpanel_restart_system_service':
-        SafetyGuard.requireConfirmation('whm_cpanel_restart_system_service', args);
-        return await withOperationTimeout(
-          () => this.sshManager.restartService(args.service),
-          'whm_cpanel_restart_system_service'
-        );
+      case 'whm_cpanel_manage_system_services': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_system');
 
-      case 'whm_cpanel_get_system_load_metrics':
-        return await withOperationTimeout(
-          () => this.sshManager.getSystemLoad(),
-          'whm_cpanel_get_system_load_metrics'
-        );
+        switch (action) {
+          case 'restart_service':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_system_services', args);
+            return await withOperationTimeout(
+              () => this.sshManager.restartService(args.service),
+              'whm_cpanel_manage_system_services'
+            );
 
-      case 'whm_cpanel_read_system_log_lines':
-        return await withOperationTimeout(
-          () => this.sshManager.readLogLines(args.log_file, args.lines || 50),
-          'whm_cpanel_read_system_log_lines'
-        );
+          case 'get_load':
+            return await withOperationTimeout(
+              () => this.sshManager.getSystemLoad(),
+              'whm_cpanel_manage_system_services'
+            );
+
+          case 'read_logs':
+            if (!args.log_file) throw new Error('log_file obrigatorio para action=read_logs');
+            return await withOperationTimeout(
+              () => this.sshManager.readLogLines(args.log_file, args.lines || 50),
+              'whm_cpanel_manage_system_services'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: restart_service, get_load, read_logs`);
+        }
+      }
 
       default:
         throw new Error(`Unknown SSH tool: ${name}`);
@@ -1413,7 +1315,7 @@ class MCPHandler {
   }
 
   /**
-   * Executa tools de arquivo (AC05)
+   * Executa tools de arquivo consolidadas (search_files, manage_files)
    */
   async executeFileTool(name, args) {
     if (!this.fileManager) {
@@ -1421,39 +1323,111 @@ class MCPHandler {
     }
 
     switch (name) {
-      case 'whm_cpanel_list_user_files':
-        return await withOperationTimeout(
-          () => this.fileManager.listDirectory(args.cpanel_user, args.path),
-          'whm_cpanel_list_user_files'
-        );
+      case 'whm_cpanel_search_account_files': {
+        const searchType = args.searchType;
+        if (!searchType) throw new Error('searchType obrigatorio para search_files');
 
-      case 'whm_cpanel_read_user_file':
-        return await withOperationTimeout(
-          () => this.fileManager.readFile(args.cpanel_user, args.path),
-          'whm_cpanel_read_user_file'
-        );
+        switch (searchType) {
+          case 'list':
+            return await withOperationTimeout(
+              () => this.fileManager.listDirectory(args.cpanel_user, args.path),
+              'whm_cpanel_search_account_files'
+            );
 
-      case 'whm_cpanel_write_user_file':
-        SafetyGuard.requireConfirmation('whm_cpanel_write_user_file', args);
-        return await withOperationTimeout(
-          () => this.fileManager.writeFile(args.cpanel_user, args.path, args.content, {
-            encoding: args.encoding,
-            createDirs: args.create_dirs
-          }),
-          'whm_cpanel_write_user_file'
-        );
+          case 'read':
+            if (!args.path) throw new Error('path obrigatorio para searchType=read');
+            return await withOperationTimeout(
+              () => this.fileManager.readFile(args.cpanel_user, args.path),
+              'whm_cpanel_search_account_files'
+            );
 
-      case 'whm_cpanel_delete_user_file':
-        SafetyGuard.requireConfirmation('whm_cpanel_delete_user_file', args);
-        return await withOperationTimeout(
-          () => this.fileManager.deleteFile(args.cpanel_user, args.path, {
-            force: args.force
-          }),
-          'whm_cpanel_delete_user_file'
-        );
+          default:
+            throw new Error(`searchType invalido: ${searchType}. Valores aceitos: list, read`);
+        }
+      }
+
+      case 'whm_cpanel_manage_account_files': {
+        const action = args.action;
+        if (!action) throw new Error('action obrigatorio para manage_files');
+
+        switch (action) {
+          case 'write':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_account_files', args);
+            return await withOperationTimeout(
+              () => this.fileManager.writeFile(args.cpanel_user, args.path, args.content, {
+                encoding: args.encoding,
+                createDirs: args.create_dirs
+              }),
+              'whm_cpanel_manage_account_files'
+            );
+
+          case 'delete':
+            SafetyGuard.requireConfirmation('whm_cpanel_manage_account_files', args);
+            return await withOperationTimeout(
+              () => this.fileManager.deleteFile(args.cpanel_user, args.path, {
+                force: args.force
+              }),
+              'whm_cpanel_manage_account_files'
+            );
+
+          default:
+            throw new Error(`action invalida: ${action}. Valores aceitos: write, delete`);
+        }
+      }
 
       default:
         throw new Error(`Unknown file tool: ${name}`);
+    }
+  }
+
+  /**
+   * SPEC-WHM-ENHANCE-001 / F08 - Bridge tools
+   */
+  async executeBridgeTool(name, args) {
+    switch (name) {
+      case 'whm_cpanel_list_server_resources':
+        return listResources().map(r => `- **${r.name}**: \`${r.uri}\` — ${r.description}`).join('\n');
+
+      case 'whm_cpanel_read_server_resource': {
+        if (!args.uri) throw new Error('URI obrigatoria. URIs disponiveis: whm://server/config, whm://server/status');
+        const result = await readResource(args.uri, this.whmService);
+        return result.text;
+      }
+
+      case 'whm_cpanel_list_server_prompts':
+        return WHM_PROMPTS.map(p => `- **${p.name}**: ${p.description}`).join('\n');
+
+      case 'whm_cpanel_get_analysis_prompt': {
+        if (!args.name) throw new Error('Nome do prompt obrigatorio. Use whm_cpanel_list_server_prompts para ver disponiveis.');
+        const result = await handleWHMPrompt(args.name, args.arguments || {}, this.whmService, this.dnsService);
+        if (result?.messages?.[0]?.content?.text) return result.messages[0].content.text;
+        return JSON.stringify(result, null, 2);
+      }
+
+      default:
+        throw new Error(`Unknown bridge tool: ${name}`);
+    }
+  }
+
+  /**
+   * SPEC-WHM-ENHANCE-001 / F07 - Handle resources/read
+   */
+  async handleResourceRead(id, params) {
+    const { uri } = params || {};
+    if (!uri) {
+      return this.errorResponse(id, -32602, 'Invalid params', { reason: 'URI required' });
+    }
+    try {
+      const result = await readResource(uri, this.whmService);
+      return {
+        jsonrpc: '2.0',
+        id,
+        result: {
+          contents: [result]
+        }
+      };
+    } catch (error) {
+      return this.errorResponse(id, -32602, error.message);
     }
   }
 
