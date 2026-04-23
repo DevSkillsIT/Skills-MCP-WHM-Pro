@@ -573,7 +573,7 @@ isValidRecordType(type)       // Valida tipo de registro DNS
 ```bash
 # Buscar apenas registros A (economizar tokens)
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -657,7 +657,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 
 ```bash
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -729,7 +729,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 ```bash
 # Buscar registro "prometheus" (apenas tipos A e AAAA)
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -1079,7 +1079,7 @@ curl http://mcp.example.com:3200/health
 
 ```bash
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 
 # Verificar:
@@ -1092,7 +1092,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 
 ```bash
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -1114,7 +1114,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 
 ```bash
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -1139,7 +1139,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 
 ```bash
 curl -X POST http://mcp.example.com:3200/mcp \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",

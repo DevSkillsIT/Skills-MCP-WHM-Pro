@@ -351,7 +351,7 @@ whm-cpanel/
 ```bash
 curl -X POST http://localhost:3200/mcp \
   -H 'Content-Type: application/json' \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
 ```
 
@@ -365,7 +365,7 @@ curl -X POST http://localhost:3200/mcp \
 ```bash
 curl -X POST http://localhost:3200/mcp \
   -H 'Content-Type: application/json' \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -384,7 +384,7 @@ curl -X POST http://localhost:3200/mcp \
 ```bash
 curl -X POST http://localhost:3200/mcp \
   -H 'Content-Type: application/json' \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",
@@ -406,7 +406,7 @@ curl -X POST http://localhost:3200/mcp \
 ```bash
 curl -X POST http://localhost:3200/mcp \
   -H 'Content-Type: application/json' \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc":"2.0",
     "method":"tools/call",

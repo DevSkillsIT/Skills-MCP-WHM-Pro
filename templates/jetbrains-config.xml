@@ -15,10 +15,10 @@
 
       <environment>
         <variable name="WHM_HOST" value="https://seu-servidor-whm.com:2087"/>
-        <variable name="WHM_USERNAME" value="YOUR_USERNAME"/>
+        <variable name="WHM_USERNAME" value="YOUR_WHM_USERNAME"/>
         <variable name="WHM_API_TOKEN" value="seu-token-api-whm"/>
         <variable name="MCP_PORT" value="3200"/>
-        <variable name="WHM_MCP_API_KEY" value="REDACTED_API_KEY"/>
+        <variable name="WHM_MCP_API_KEY" value="YOUR_WHM_MCP_API_KEY"/>
         <variable name="NODE_ENV" value="production"/>
         <variable name="LOG_LEVEL" value="info"/>
         <variable name="TIMEOUT_WHM_API" value="30000"/>

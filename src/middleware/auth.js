@@ -22,7 +22,7 @@ function isValidKeyFormat(key) {
   }
 
   // Formato: sk_whm_mcp_{env}_{random}
-  // Exemplo: REDACTED_API_KEY
+  // Exemplo: YOUR_WHM_MCP_API_KEY
   // Aceita hex (a-f0-9) ou alfanumerico (a-z0-9) para flexibilidade
   const pattern = /^sk_whm_mcp_[a-z]+_[a-z0-9]{8,}$/i;
   return pattern.test(key) && key.length >= 24;

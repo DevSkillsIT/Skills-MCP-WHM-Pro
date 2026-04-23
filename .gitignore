@@ -1,7 +1,17 @@
-# Environment
+# Environment and secrets
 .env
 .env.local
 .env.*.local
+
+# Private keys and certificates (NEVER commit)
+*.pem
+*.ppk
+*.key
+*.p12
+*.pfx
+*.cert
+id_rsa
+id_ed25519
 
 # Dependencies
 node_modules/

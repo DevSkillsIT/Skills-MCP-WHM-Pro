@@ -13,7 +13,7 @@
 // ⚙️  CONFIGURAÇÃO - Valores do .env do servidor
 //
 // 1. x-api-key: Copie WHM_MCP_API_KEY do arquivo .env
-//    Exemplo: REDACTED_API_KEY
+//    Exemplo: YOUR_WHM_MCP_API_KEY
 //
 // 2. Para operações destrutivas (delete, suspend, restart):
 //    - confirmationToken: Use MCP_SAFETY_TOKEN do .env

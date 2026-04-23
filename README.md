@@ -413,7 +413,7 @@ Expected response:
 # List available tools
 curl -X POST http://mcp.example.com:3200/mcp \
   -H 'Content-Type: application/json' \
-  -H 'x-api-key: REDACTED_API_KEY' \
+  -H 'x-api-key: YOUR_WHM_MCP_API_KEY' \
   -d '{
     "jsonrpc": "2.0",
     "method": "tools/list",
