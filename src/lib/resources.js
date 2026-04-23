@@ -27,7 +27,7 @@ function listResources() {
   return WHM_RESOURCES;
 }
 
-async function readResource(uri, whmService) {
+async function readResource(uri, whmService, sshManager) {
   const { formatServerStatus, formatServicesStatus } = require('./formatters/whm-formatters');
 
   switch (uri) {
@@ -36,10 +36,27 @@ async function readResource(uri, whmService) {
       return { uri, mimeType: 'text/markdown', text: formatServerStatus(data) };
     }
     case 'whm://server/status': {
-      const [status, services] = await Promise.all([
-        whmService.getServerStatus(),
-        whmService.getServiceStatus()
-      ]);
+      const status = await whmService.getServerStatus();
+
+      // servicestatus may fail due to malformed HTTP headers from WHM
+      let services;
+      try {
+        services = await whmService.getServiceStatus();
+      } catch (apiError) {
+        // Fallback to SSH if available
+        if (sshManager && apiError.message?.includes('Parse Error')) {
+          try {
+            const sshResult = await sshManager._executeCommand('whmapi1 servicestatus --output=json');
+            const parsed = JSON.parse(sshResult.output);
+            services = { services: parsed?.data?.service || [], timestamp: new Date().toISOString() };
+          } catch (_) {
+            services = { services: [], error: apiError.message };
+          }
+        } else {
+          services = { services: [], error: apiError.message };
+        }
+      }
+
       const md = formatServerStatus(status) + '\n\n---\n\n' + formatServicesStatus(services);
       return { uri, mimeType: 'text/markdown', text: md };
     }

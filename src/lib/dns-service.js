@@ -493,6 +493,9 @@ class DNSService {
         'whm_cpanel_create_dns_record'
       );
 
+      // Invalidar cache da zona apos escrita
+      dnsCache.invalidatePattern(zone);
+
       const [seconds, nanoseconds] = process.hrtime(startTime);
       dnsOperationDuration.observe(
         { operation: 'add_record', status: 'success' },
@@ -556,6 +559,9 @@ class DNSService {
         getTimeoutByType('DNS'),
         'whm_cpanel_update_dns_record'
       );
+
+      // Invalidar cache da zona apos escrita
+      dnsCache.invalidatePattern(zone);
 
       // Validar zona apos modificacao
       const updatedZone = await this.getZone(zone);
@@ -638,6 +644,9 @@ class DNSService {
         getTimeoutByType('DNS'),
         'whm_cpanel_delete_dns_record'
       );
+
+      // Invalidar cache da zona apos escrita
+      dnsCache.invalidatePattern(zone);
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
       dnsOperationDuration.observe(

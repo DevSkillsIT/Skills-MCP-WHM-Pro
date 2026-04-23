@@ -201,12 +201,12 @@ async function getPromptText(name, args, whmClient) {
   const period_days = args?.period_days || 7;
   const check_type = args?.check_type || 'all';
   const expiring_days = args?.expiring_days || 30;
-  const account_name = args?.account_name;
-  const domain = args?.domain;
-  const search_term = args?.search_term;
-  const email_address = args?.email_address;
-  const domain_from = args?.domain_from;
-  const domain_to = args?.domain_to;
+  const account_name = args?.account_name || args?.username;
+  const domain = args?.domain || args?.zone;
+  const search_term = args?.search_term || args?.query;
+  const email_address = args?.email_address || 'usuario@dominio.com';
+  const domain_from = args?.domain_from || 'origem';
+  const domain_to = args?.domain_to || 'destino';
   const backup_date = args?.backup_date || 'mais recente';
 
   switch (name) {

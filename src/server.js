@@ -180,7 +180,7 @@ app.post('/mcp', async (req, res) => {
   try {
     logger.logRequest(req);
 
-    const result = await mcpHandler.handleRequest(req.body);
+    const result = await mcpHandler.handleRequest(req.body, req.headers);
 
     res.json(result);
   } catch (error) {

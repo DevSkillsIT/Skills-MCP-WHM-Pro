@@ -101,7 +101,14 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 - **Better Security** - API key authentication via headers (more secure than env vars)
 - **Easier Debugging** - Test with curl, Postman, or any HTTP client
 - **Multi-IDE Compatible** - Works with Claude Desktop, VS Code, Cursor, Windsurf, Zed, and more
-- **Token-Optimized** - Markdown response format reduces token consumption by 50-81%
+- **Token-Optimized** - Markdown response format reduces token consumption by **50-81%** vs. JSON
+
+### 🔧 Production Stability (28+ Fixes in v2.0.0)
+- **SSH Fallback for servicestatus** - Automatic fallback to SSH when WHM HTTP headers malformed
+- **DNS Cache Invalidation** - Automatic cache cleanup after create/update/delete operations
+- **Optimized Timeouts** - Configurable per-operation timeouts with NSEC3 dynamic calculation
+- **Robust Safety Guard** - Comprehensive token validation and reason enforcement for all destructive operations
+- **Complete Tool Consolidation** - 44+ tools → 16 unified search_*/manage_* pattern with clear separation
 
 ### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
 
@@ -436,12 +443,15 @@ curl -X POST http://localhost:3100/mcp \
 
 ### Tool Architecture (v2.0.0)
 
-The v2.0.0 release consolidates 44+ individual tools into 16 unified tools using an intelligent search_*/manage_* pattern:
+After 28+ bug fixes and comprehensive validation, the v2.0.0 release consolidates 44+ individual tools into **16 unified tools** using an intelligent search_*/manage_* consolidation pattern:
 
-- **12 Core Tools**: Complete WHM/cPanel operations (search + manage pairs)
-- **Markdown Responses**: All tools return Markdown tables for 50-81% token reduction
-- **Tool Annotations**: Every tool includes readOnlyHint, destructiveHint, idempotentHint, openWorldHint
-- **Pagination**: Smart pagination with limit=25 (max=50) for all list operations
+**Architecture Summary:**
+- **12 Core Tools**: Complete WHM/cPanel operations (search + manage pairs for dual-purpose operations)
+- **4 Utility Tools**: Server resources, prompts, and analysis helpers
+- **Markdown Responses**: All tools return Markdown tables for **50-81% token reduction** vs. raw JSON
+- **Tool Annotations**: Every tool includes `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` for AI safety
+- **Smart Pagination**: Default limit=25 (max=50) for all search operations with `has_more` and `next_offset` metadata
+- **Bug Fixes**: 28+ production fixes including SSH fallback, DNS caching, timeout optimization, safety guard improvements
 
 ### Core Tools (12)
 

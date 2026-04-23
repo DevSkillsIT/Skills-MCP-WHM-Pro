@@ -27,7 +27,7 @@ function parseZoneRecords(zoneData) {
   for (const record of rawRecords) {
     try {
       const parsed = {
-        line: record.line,
+        line: record.Line || record.line,
         type: record.type,
         name: record.name,
         ttl: record.ttl,

@@ -206,13 +206,19 @@ class FileManager {
     }
 
     try {
+      // cPanel Fileman::viewfile needs separate 'file' (basename) and 'dir' (directory) params
+      const baseDir = `/home/${cpanelUser}`;
+      const fullPath = validation.path;
+      const fileName = path.basename(fullPath);
+      const dirName = path.dirname(fullPath);
+
       const params = new URLSearchParams({
-        'api.version': '1',
         'cpanel_jsonapi_user': cpanelUser,
         'cpanel_jsonapi_module': 'Fileman',
-        'cpanel_jsonapi_func': 'get_file_content',
+        'cpanel_jsonapi_func': 'viewfile',
         'cpanel_jsonapi_apiversion': '2',
-        'file': validation.path
+        'file': fileName,
+        'dir': dirName
       });
 
       const response = await withTimeout(
@@ -221,9 +227,21 @@ class FileManager {
         'file_read'
       );
 
-      if (response.data?.cpanelresult?.data?.[0]) {
-        const content = response.data.cpanelresult.data[0].content;
-        const decoded = Buffer.from(content, 'base64').toString('utf8');
+      const cpResult = response.data?.cpanelresult;
+      const fileData = cpResult?.data?.[0];
+
+      if (fileData && !cpResult?.error) {
+        // viewfile returns HTML-encoded content in 'contents' field
+        const rawContent = fileData.contents || fileData.content || '';
+        // Decode HTML entities (&#39; -> ', &lt; -> <, &gt; -> >, &amp; -> &, &#34; -> ")
+        const decoded = rawContent
+          .replace(/&#39;/g, "'")
+          .replace(/&lt;/g, '<')
+          .replace(/&gt;/g, '>')
+          .replace(/&amp;/g, '&')
+          .replace(/&#34;/g, '"')
+          .replace(/&quot;/g, '"')
+          .replace(/\r\n/g, '\n');
 
         return {
           success: true,
@@ -231,12 +249,18 @@ class FileManager {
             content: decoded,
             encoding: 'utf8',
             size: decoded.length,
-            path: validation.path
+            path: fullPath,
+            mimetype: fileData.mimetype || 'text/plain'
           }
         };
       }
 
-      throw new Error('Failed to read file');
+      // Check for error in response
+      if (cpResult?.error) {
+        throw new Error(`cPanel API: ${cpResult.error}`);
+      }
+
+      throw new Error(`Failed to read file: ${fullPath}`);
     } catch (error) {
       logger.error(`Error reading file ${filePath}: ${error.message}`);
       throw error;
@@ -286,24 +310,34 @@ class FileManager {
         await this.createDirectory(cpanelUser, dir);
       }
 
-      // Escrever arquivo
+      // cPanel Fileman::savefile needs separate dir, filename, and content (plain text)
+      const fullPath = validation.path;
+      const fileName = path.basename(fullPath);
+      const dirName = path.dirname(fullPath);
+
       const params = new URLSearchParams({
-        'api.version': '1',
         'cpanel_jsonapi_user': cpanelUser,
         'cpanel_jsonapi_module': 'Fileman',
-        'cpanel_jsonapi_func': 'save_file_content',
+        'cpanel_jsonapi_func': 'savefile',
         'cpanel_jsonapi_apiversion': '2',
-        'file': validation.path,
-        'content': Buffer.from(content).toString('base64')
+        'dir': dirName,
+        'filename': fileName,
+        'content': content
       });
 
       const response = await withTimeout(
-        () => this.api.post(`/json-api/cpanel?api.version=1`, params.toString(), {
+        () => this.api.post(`/json-api/cpanel`, params.toString(), {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }),
         getTimeoutByType('FILE'),
         'file_write'
       );
+
+      // Verify write succeeded
+      const cpResult = response.data?.cpanelresult;
+      if (cpResult?.error) {
+        throw new Error(`cPanel write failed: ${cpResult.error}`);
+      }
 
       const message = backupCreated ? 'File overwritten successfully' : 'File written successfully';
 
@@ -311,7 +345,7 @@ class FileManager {
         success: true,
         data: {
           message: message,
-          path: validation.path,
+          path: fullPath,
           bytes_written: content.length,
           backup_created: backupCreated
         }
@@ -353,24 +387,33 @@ class FileManager {
         }
       }
 
-      // Deletar arquivo
+      // Deletar arquivo via cPanel Fileman::fileop (unlink)
+      const fullPath = validation.path;
+      const dirName = path.dirname(fullPath);
+
       const params = new URLSearchParams({
-        'api.version': '1',
         'cpanel_jsonapi_user': cpanelUser,
         'cpanel_jsonapi_module': 'Fileman',
         'cpanel_jsonapi_func': 'fileop',
         'cpanel_jsonapi_apiversion': '2',
         'op': 'unlink',
-        'sourcefiles': validation.path
+        'sourcefiles': fullPath,
+        'dir': dirName
       });
 
       const response = await withTimeout(
-        () => this.api.post(`/json-api/cpanel?api.version=1`, params.toString(), {
+        () => this.api.post(`/json-api/cpanel`, params.toString(), {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
         }),
         getTimeoutByType('FILE'),
         'file_delete'
       );
+
+      // Verify delete succeeded
+      const cpResult = response.data?.cpanelresult;
+      if (cpResult?.error) {
+        throw new Error(`cPanel delete failed: ${cpResult.error}`);
+      }
 
       return {
         success: true,
@@ -429,25 +472,30 @@ class FileManager {
    */
   async getQuotaInfo(cpanelUser) {
     try {
+      // Use UAPI v3 (Quota::get_quota_info) - cPanel API v2 Quota::getquota is deprecated
       const params = new URLSearchParams({
-        'api.version': '1',
         'cpanel_jsonapi_user': cpanelUser,
         'cpanel_jsonapi_module': 'Quota',
-        'cpanel_jsonapi_func': 'getquota',
-        'cpanel_jsonapi_apiversion': '2'
+        'cpanel_jsonapi_func': 'get_quota_info',
+        'cpanel_jsonapi_apiversion': '3'
       });
 
       const response = await this.api.get(`/json-api/cpanel?${params}`);
-      const data = response.data?.cpanelresult?.data?.[0] || {};
+      // UAPI v3 response: { result: { data: { megabytes_used, megabyte_limit, ... } } }
+      const data = response.data?.result?.data || {};
+
+      const usedMB = parseFloat(data.megabytes_used) || 0;
+      const limitMB = parseFloat(data.megabyte_limit) || 0;
+      const remainMB = parseFloat(data.megabytes_remain) || 0;
 
       return {
-        used: parseInt(data.diskused) * 1024 * 1024 || 0, // MB -> bytes
-        limit: parseInt(data.diskquota) * 1024 * 1024 || 0,
-        available: (parseInt(data.diskavailable) || 0) * 1024 * 1024
+        used: Math.round(usedMB * 1024 * 1024),
+        limit: limitMB > 0 ? Math.round(limitMB * 1024 * 1024) : Number.MAX_SAFE_INTEGER,
+        available: remainMB > 0 ? Math.round(remainMB * 1024 * 1024) : Number.MAX_SAFE_INTEGER
       };
     } catch (error) {
       logger.warn(`Failed to get quota info for ${cpanelUser}: ${error.message}`);
-      // Retornar quota "ilimitada" em caso de erro
+      // Retornar quota "ilimitada" em caso de erro para nao bloquear operacao
       return {
         used: 0,
         limit: Number.MAX_SAFE_INTEGER,

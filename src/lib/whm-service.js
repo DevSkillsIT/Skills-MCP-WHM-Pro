@@ -72,7 +72,12 @@ class WHMService {
 
     // Configuracao de TLS
     const verifyTLS = config.verifyTLS !== false;
-    const httpsAgentOptions = { rejectUnauthorized: verifyTLS };
+    const httpsAgentOptions = {
+      rejectUnauthorized: verifyTLS,
+      // WHM injects malformed headers (e.g. service status lines without colon separator)
+      // insecureHTTPParser tolerates non-standard HTTP headers from cPanel/WHM
+      insecureHTTPParser: true
+    };
 
     // Criar cliente axios
     this.api = axios.create({
@@ -81,7 +86,9 @@ class WHMService {
         Authorization: `whm ${this.username}:${this.apiToken}`
       },
       httpsAgent: new https.Agent(httpsAgentOptions),
-      timeout: getTimeoutByType('WHM_API')
+      timeout: getTimeoutByType('WHM_API'),
+      // Also set at axios level for http adapter compatibility
+      insecureHTTPParser: true
     });
 
     // Configuracao de retry
@@ -173,7 +180,10 @@ class WHMService {
         const params = new URLSearchParams();
         params.append('api.version', '1');
         for (const [key, value] of Object.entries(data)) {
-          params.append(key, String(value));
+          // Skip undefined/null values to prevent sending "undefined" strings to WHM API
+          if (value !== undefined && value !== null) {
+            params.append(key, String(value));
+          }
         }
 
         const response = await this.api.post(endpoint, params.toString(), {
@@ -246,9 +256,11 @@ class WHMService {
 
   async getAccountSummary(username) {
     const result = await this.get('accountsummary', { user: username });
+    // WHM API returns { data: { acct: [{...}] } } - extract first account
+    const acctData = result?.data?.acct?.[0] || result?.acct?.[0] || result?.data || result;
     return {
       success: true,
-      data: result.data || result
+      data: acctData
     };
   }
 
@@ -329,42 +341,62 @@ class WHMService {
 
   async getServerStatus() {
     try {
+      // WHM /loadavg returns { data: { one: "0.12", five: "0.25", fifteen: "0.18" } }
       const loadavg = await this.get('loadavg');
-      const systemstats = await this.get('systemstats');
+      const loadData = loadavg?.data || loadavg || {};
+
+      // Try to get version info from /version endpoint
+      let version = 'N/A';
+      let hostname = 'N/A';
+      try {
+        const versionResult = await this.get('version');
+        version = versionResult?.data?.version || versionResult?.version || 'N/A';
+      } catch (_) { /* version endpoint optional */ }
+
+      try {
+        const hostnameResult = await this.get('gethostname');
+        hostname = hostnameResult?.data?.hostname || hostnameResult?.hostname || 'N/A';
+      } catch (_) { /* hostname endpoint optional */ }
 
       return {
         status: 'active',
-        load: loadavg.data || [0, 0, 0],
-        uptime: systemstats.data?.uptime || 'Unknown',
-        memory: systemstats.data?.memory || { total: 'Unknown', used: 'Unknown', free: 'Unknown' },
+        version,
+        hostname,
+        // Map WHM loadavg fields to what the formatter expects
+        one: loadData.one || loadData.loadavg?.[0] || '0',
+        five: loadData.five || loadData.loadavg?.[1] || '0',
+        fifteen: loadData.fifteen || loadData.loadavg?.[2] || '0',
+        loadavg: [
+          loadData.one || '0',
+          loadData.five || '0',
+          loadData.fifteen || '0'
+        ],
         timestamp: new Date().toISOString()
       };
     } catch (error) {
       return {
         status: 'active',
-        load: [0, 0, 0],
-        uptime: 'Unknown',
-        memory: { total: 'Unknown', used: 'Unknown', free: 'Unknown' },
+        version: 'N/A',
+        hostname: 'N/A',
+        one: '0', five: '0', fifteen: '0',
+        loadavg: ['0', '0', '0'],
         timestamp: new Date().toISOString(),
-        note: 'Detailed stats unavailable'
+        note: `Detailed stats unavailable: ${error.message}`
       };
     }
   }
 
   async getServiceStatus() {
-    try {
-      const result = await this.get('servicestatus');
-      return {
-        services: result.data?.services || [],
-        timestamp: new Date().toISOString()
-      };
-    } catch (error) {
-      return {
-        services: [],
-        timestamp: new Date().toISOString(),
-        error: 'Service status unavailable'
-      };
-    }
+    // WHM /servicestatus returns { data: { service: [{name, running, monitored}...] } }
+    // NOTE: This endpoint may inject malformed HTTP headers that Node.js rejects.
+    // We propagate the error so the handler can fallback to SSH.
+    const result = await this.get('servicestatus');
+    const serviceData = result?.data?.service || result?.data?.services || result?.service || [];
+    const services = Array.isArray(serviceData) ? serviceData : [];
+    return {
+      services,
+      timestamp: new Date().toISOString()
+    };
   }
 
   async restartService(service) {
@@ -389,20 +421,42 @@ class WHMService {
   // Domain Management APIs
   // ============================================
 
-  async listDomains(username) {
+  async listDomains(username, limit = 50, offset = 0) {
     try {
-      const result = await this.get('listsubdomains', { user: username });
+      // Use get_domain_info which lists ALL domain types, then filter by owner
+      const result = await this.get('get_domain_info', { limit: 500, offset: 0 });
+      let domains = result?.data?.domains || result?.data || [];
+      // Filter domains owned by this user
+      if (username) {
+        domains = domains.filter(d =>
+          (d.user || d.owner || '').toLowerCase() === username.toLowerCase()
+        );
+      }
+      // Apply client-side pagination after filtering
+      const total = domains.length;
+      const safeLimit = Math.min(limit || 50, 50);
+      const safeOffset = offset || 0;
+      const paged = domains.slice(safeOffset, safeOffset + safeLimit);
       return {
-        domains: result.data || [],
-        user: username,
-        timestamp: new Date().toISOString()
+        success: true,
+        data: paged,
+        pagination: { total, limit: safeLimit, offset: safeOffset }
       };
     } catch (error) {
+      // Fallback: try accountsummary to get at least the main domain
+      try {
+        const acctResult = await this.get('accountsummary', { user: username });
+        const acct = acctResult?.data?.acct?.[0];
+        if (acct?.domain) {
+          return {
+            success: true,
+            data: [{ domain: acct.domain, type: 'main', user: username }]
+          };
+        }
+      } catch (_) { /* fallback failed */ }
       return {
-        domains: [],
-        user: username,
-        timestamp: new Date().toISOString(),
-        error: 'Domain list unavailable'
+        success: true,
+        data: []
       };
     }
   }
@@ -492,9 +546,20 @@ class WHMService {
     }
 
     const result = await this.get('domainuserdata', { domain: validation.sanitized });
+    // WHM /domainuserdata returns { data: { userdata: { ... } } }
+    const userdata = result?.data?.userdata || result?.userdata || result?.data || result;
     return {
       success: true,
-      data: result.data || result
+      data: {
+        domain: userdata.servername || userdata.domain || domain,
+        user: userdata.user || userdata.owner || '',
+        owner: userdata.user || userdata.owner || '',
+        type: userdata.addon_flag === '1' ? 'addon' : (userdata.sub_flag === '1' ? 'subdomain' : 'main'),
+        ip: userdata.ip || '',
+        documentroot: userdata.documentroot || userdata.homedir || '',
+        php_version: userdata.phpversion || userdata.php_version || 'N/A',
+        status: userdata.suspended ? 'Suspenso' : 'Ativo'
+      }
     };
   }
 
@@ -507,9 +572,9 @@ class WHMService {
    * - BUG-IMP-01: Retornar metadados de paginação completos (RNF07)
    * - FEATURE: domainFilter para filtrar por nome de domínio (substring, case-insensitive)
    */
-  async getAllDomainInfo(limit = 100, offset = 0, filter = null, domainFilter = null) {
-    // BUG-IMP-01: Max 1000, não 100
-    const safeLimit = Math.max(1, Math.min(limit, 1000));
+  async getAllDomainInfo(limit = 50, offset = 0, filter = null, domainFilter = null) {
+    // Default 50, max 500 para economia de tokens
+    const safeLimit = Math.max(1, Math.min(limit, 500));
     const safeOffset = Math.max(0, offset);
 
     const params = {
@@ -568,9 +633,21 @@ class WHMService {
     }
 
     const result = await this.get('getdomainowner', { domain: validation.sanitized });
+    // WHM /getdomainowner returns { data: { user: "username" } } or { data: "username" }
+    const ownerData = result?.data || result;
+    const owner = typeof ownerData === 'string' ? ownerData : (ownerData?.user || ownerData?.owner || '');
     return {
       success: true,
-      data: result.data || result
+      data: {
+        domain,
+        owner,
+        user: owner,
+        type: '',
+        ip: '',
+        documentroot: '',
+        php_version: 'N/A',
+        status: 'Ativo'
+      }
     };
   }
 
@@ -619,19 +696,35 @@ class WHMService {
       }
     }
 
+    // WHM API create_parked_domain_for_user expects:
+    // - domain: the alias domain to add (e.g. "alias.com.br")
+    // - web_vhost_domain: the main domain of the account (e.g. "skillsteste.com.br")
+    // - username: cPanel account owner
+
+    // Get the main domain of the account to use as web_vhost_domain
+    let webVhostDomain = targetDomain;
+    if (!webVhostDomain) {
+      try {
+        const acctInfo = await this.getAccountSummary(username);
+        webVhostDomain = acctInfo.data?.domain || acctInfo.data?.maindomain;
+      } catch (_) {
+        // fallback: assume domain parameter pattern
+      }
+    }
+
+    if (webVhostDomain) {
+      const targetValidation = validateDomain(webVhostDomain);
+      if (!targetValidation.isValid) {
+        throw new WHMError(`Target domain inválido: ${targetValidation.error}`, { webVhostDomain });
+      }
+      webVhostDomain = targetValidation.sanitized;
+    }
+
     const params = {
       domain: domainValidation.sanitized,
-      username: username
+      username: username,
+      web_vhost_domain: webVhostDomain
     };
-
-    // BUG-CRIT-03: Apenas validar targetDomain se fornecido
-    if (targetDomain) {
-      const targetValidation = validateDomain(targetDomain);
-      if (!targetValidation.isValid) {
-        throw new WHMError(`Target domain inválido: ${targetValidation.error}`, { targetDomain });
-      }
-      params.targetdomain = targetValidation.sanitized;
-    }
 
     const result = await this.post('create_parked_domain_for_user', params);
 
@@ -708,11 +801,17 @@ class WHMService {
       }
     }
 
+    // WHM API create_subdomain expects:
+    // - domain: full FQDN (e.g. blog.skillsteste.com.br)
+    // - document_root: relative path from home (e.g. public_html/blog)
+    // - username: cPanel account owner
+    const fullSubdomain2 = `${subdomainValidation.sanitized}.${domainValidation.sanitized}`;
+    const docRoot = sanitizedDocRoot || `public_html/${subdomainValidation.sanitized}`;
+
     const result = await this.post('create_subdomain', {
-      domain: domainValidation.sanitized,
-      subdomain: subdomainValidation.sanitized,
+      domain: fullSubdomain2,
       username: username,
-      dir: sanitizedDocRoot
+      document_root: docRoot
     });
 
     return {
@@ -944,9 +1043,16 @@ class WHMService {
     }
 
     const result = await this.get('has_local_authority', { domain: validation.sanitized });
+    // WHM returns { data: { local_authority: 1/0 } }
+    const authorityData = result?.data || result;
+    const hasAuthority = authorityData?.local_authority === 1 || authorityData?.local_authority === '1';
     return {
       success: true,
-      data: result.data || result
+      data: {
+        domain,
+        type: hasAuthority ? 'local' : 'remote',
+        status: hasAuthority ? 'Autoritativo' : 'Nao autoritativo'
+      }
     };
   }
 
@@ -962,9 +1068,18 @@ class WHMService {
     }
 
     const result = await this.get('listmxs', { domain: validation.sanitized });
+    // WHM /listmxs returns { data: { record: [{exchange, preference, domain}...] } }
+    const mxData = result?.data?.record || result?.data?.records || result?.record || [];
+    const records = Array.isArray(mxData) ? mxData : [mxData].filter(Boolean);
+    // Add domain field to each record if missing
+    const enriched = records.map(r => ({
+      domain: r.domain || domain,
+      exchange: r.exchange || r.exchanger || '',
+      preference: r.preference || r.priority || 0
+    }));
     return {
       success: true,
-      data: result.data || result
+      data: enriched
     };
   }
 

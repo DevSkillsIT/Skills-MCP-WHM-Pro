@@ -171,9 +171,10 @@ class SSHManager {
 
       const connectionConfig = {
         host: this.host,
-        port: this.port,
+        port: parseInt(this.port, 10) || 22,
         username: this.username,
-        readyTimeout: 30000,
+        readyTimeout: 45000,
+        keepaliveInterval: 10000,
         algorithms: {
           serverHostKey: ['ssh-rsa', 'ssh-dss', 'ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521', 'ssh-ed25519']
         }

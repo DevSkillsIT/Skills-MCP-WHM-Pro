@@ -76,21 +76,31 @@ function formatServerStatus(data) {
 
 function formatServicesStatus(data) {
   if (!data) return 'Status dos servicos nao disponivel.';
-  const services = Array.isArray(data) ? data : (data?.data || data?.service || []);
+  // Handle both direct array and wrapped { services: [...] } or { service: [...] }
+  const services = Array.isArray(data) ? data : (data?.services || data?.service || data?.data || []);
   if (Array.isArray(services) && services.length > 0) {
-    const rows = services.map(s =>
-      `| ${esc(s.name || s.service)} | ${s.running || s.enabled ? 'Ativo' : 'Parado'} | ${s.monitored ? 'Sim' : 'Nao'} |`
-    ).join('\n');
+    const rows = services.map(s => {
+      const name = s.name || s.service || 'unknown';
+      const isRunning = s.running === 1 || s.running === true || s.enabled === 1 || s.enabled === true;
+      const monitored = s.monitored === 1 || s.monitored === true;
+      return `| ${esc(name)} | ${isRunning ? 'Ativo' : 'Parado'} | ${monitored ? 'Sim' : 'Nao'} |`;
+    }).join('\n');
     return `**${services.length} servicos**\n\n| Servico | Status | Monitorado |\n|---|---|---|\n${rows}`;
   }
+  // Handle error or empty state
+  if (data?.error) {
+    return `Status dos servicos: ${esc(data.error)}`;
+  }
   // Se retornar como objeto chave-valor
-  if (typeof data === 'object') {
-    const entries = Object.entries(data?.data || data).filter(([k]) => !k.startsWith('_'));
-    const rows = entries.map(([name, info]) => {
-      const status = typeof info === 'object' ? (info.running ? 'Ativo' : 'Parado') : String(info);
-      return `| ${esc(name)} | ${esc(status)} |`;
-    }).join('\n');
-    return `**${entries.length} servicos**\n\n| Servico | Status |\n|---|---|\n${rows}`;
+  if (typeof data === 'object' && !Array.isArray(data)) {
+    const entries = Object.entries(data).filter(([k]) => !['timestamp', 'error', 'services', 'service', 'data', '_'].some(x => k.startsWith(x)));
+    if (entries.length > 0) {
+      const rows = entries.map(([name, info]) => {
+        const status = typeof info === 'object' ? (info.running ? 'Ativo' : 'Parado') : String(info);
+        return `| ${esc(name)} | ${esc(status)} |`;
+      }).join('\n');
+      return `**${entries.length} servicos**\n\n| Servico | Status |\n|---|---|\n${rows}`;
+    }
   }
   return 'Status dos servicos nao disponivel.';
 }
@@ -143,7 +153,7 @@ function formatDnsRecordsList(data) {
   if (!items || !items.length) return 'Nenhum registro DNS encontrado.';
   const header = pageInfo(count, limit, offset, total);
   const rows = items.map(r =>
-    `| ${esc(r.name)} | ${esc(r.type)} | ${truncate(r.record || r.address || r.data || r.content || r.cname || r.exchange || r.txtdata || '', 100)} | ${esc(r.ttl || 'default')} | ${esc(r.Line || r.line || '')} |`
+    `| ${esc(r.name)} | ${esc(r.type)} | ${truncate(r.value || r.record || r.address || r.data || r.content || r.cname || r.exchange || r.txtdata || '', 100)} | ${esc(r.ttl || 'default')} | ${esc(r.Line || r.line || '')} |`
   ).join('\n');
   return `${header}\n\n| Nome | Tipo | Valor | TTL | Linha |\n|---|---|---|---|---|\n${rows}`;
 }
@@ -155,7 +165,7 @@ function formatDnsRecordDetail(record) {
     `| Campo | Valor |\n|---|---|\n` +
     `| Nome | ${esc(r.name)} |\n` +
     `| Tipo | ${esc(r.type)} |\n` +
-    `| Valor | ${esc(r.record || r.address || r.data || r.content || r.cname || r.exchange || r.txtdata)} |\n` +
+    `| Valor | ${esc(r.value || r.record || r.address || r.data || r.content || r.cname || r.exchange || r.txtdata)} |\n` +
     `| TTL | ${esc(r.ttl)} |\n` +
     `| Linha | ${esc(r.Line || r.line || 'N/A')} |`;
 }

@@ -82,7 +82,7 @@ const TOOL_FORMATTERS = {
   'whm_cpanel_search_dns_zone_records': (data, args) => {
     const st = args?.searchType || 'zones';
     if (st === 'records' || st === 'search') {
-      const items = Array.isArray(data) ? data : (data?.records || data?.data || []);
+      const items = Array.isArray(data) ? data : (data?.records || data?.matches || data?.data || []);
       const paged = paginate(items, args?.limit || args?.max_records, args?.offset);
       return formatDnsRecordsList(paged);
     }
