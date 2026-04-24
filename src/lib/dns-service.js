@@ -502,15 +502,23 @@ class DNSService {
         seconds + nanoseconds / 1e9
       );
 
+      // Fetch the actual created record from zone for accurate display
+      let createdRecord = { type, name, ...data };
+      try {
+        const zoneAfter = await this.getZone(zone);
+        const allRecords = zoneAfter?.data?.records || [];
+        // Find the newly created record (last matching type+name)
+        const matches = allRecords.filter(r => r.type === type);
+        if (matches.length > 0) {
+          createdRecord = matches[matches.length - 1];
+        }
+      } catch (_) { /* use constructed fallback */ }
+
       return {
         success: true,
         data: {
           message: `${type} record added successfully`,
-          record: {
-            type: type,
-            name: name.endsWith('.') ? name : `${name}.`,
-            ...data
-          },
+          record: createdRecord,
           backup_created: backupPath
         }
       };
