@@ -160,12 +160,14 @@ function formatDnsRecordsList(data) {
 
 function formatDnsRecordDetail(record) {
   if (!record) return 'Registro DNS nao encontrado.';
-  const r = record?.data || record;
+  // Avoid r.data collision with spread data from DNS record objects
+  const r = (record && !record.type && record.data) ? record.data : record;
+  const value = r.value || r.address || r.cname || r.exchange || r.txtdata || r.nsdname || r.ptrdname || '';
   return `# Registro DNS\n\n` +
     `| Campo | Valor |\n|---|---|\n` +
     `| Nome | ${esc(r.name)} |\n` +
     `| Tipo | ${esc(r.type)} |\n` +
-    `| Valor | ${esc(r.value || r.record || r.address || r.data || r.content || r.cname || r.exchange || r.txtdata)} |\n` +
+    `| Valor | ${esc(value)} |\n` +
     `| TTL | ${esc(r.ttl)} |\n` +
     `| Linha | ${esc(r.Line || r.line || 'N/A')} |`;
 }

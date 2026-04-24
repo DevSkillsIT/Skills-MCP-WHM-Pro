@@ -508,7 +508,7 @@ class DNSService {
           message: `${type} record added successfully`,
           record: {
             type: type,
-            name: `${name}.${zone}.`,
+            name: name.endsWith('.') ? name : `${name}.`,
             ...data
           },
           backup_created: backupPath

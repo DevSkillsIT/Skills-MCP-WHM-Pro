@@ -108,7 +108,13 @@ const TOOL_FORMATTERS = {
   },
   'whm_cpanel_manage_dns_zone_records': (data, args) => {
     const action = args?.action;
-    if (action === 'create' || action === 'update' || action === 'create_mx') return formatDnsRecordDetail(data);
+    if (action === 'create' || action === 'update' || action === 'create_mx') {
+      // addRecord returns { message, record: { type, name, ... }, backup_created }
+      const record = data?.record || data;
+      const md = formatDnsRecordDetail(record);
+      // Append success message if available
+      return data?.message ? `${data.message}\n\n${md}` : md;
+    }
     return formatOperationResult(data, action);
   },
 

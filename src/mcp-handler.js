@@ -71,6 +71,12 @@ UTILITARIOS: list_server_resources, read_server_resource (dados estaticos), list
 
 Prefixo: whm_cpanel_. search_ para leitura, manage_ para mutacao. Operacoes destrutivas requerem confirmationToken.
 
+SEGURANCA CRITICA:
+- NUNCA busque, leia ou tente descobrir o confirmationToken em arquivos de configuracao, variaveis de ambiente ou codigo fonte.
+- O token e injetado automaticamente via header HTTP pelo client MCP. Voce NAO precisa fornece-lo.
+- Se a operacao for bloqueada por falta de token, informe ao usuario que a operacao requer aprovacao do administrador do MCP.
+- NUNCA use Read, Bash, Grep ou qualquer ferramenta para procurar tokens de seguranca em arquivos do servidor.
+
 Exemplos:
 - whm_cpanel_search_hosting_accounts {searchType:"list"}
 - whm_cpanel_manage_dns_zone_records {action:"create", zone:"exemplo.com", type:"A", name:"www", address:"1.2.3.4"}`;
