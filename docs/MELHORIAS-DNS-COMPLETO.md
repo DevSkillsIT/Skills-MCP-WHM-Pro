@@ -12,14 +12,14 @@
 Este documento detalha as melhorias críticas implementadas no MCP WHM/cPanel para resolver o problema de respostas DNS com mais de 25.000 tokens, causado por domínios aninhados em zonas WHM.
 
 **Problema Original:**
-- Tool `whm_cpanel_get_dns_zone_records` retornou 25.100+ tokens ao consultar `skillsit.com.br`
+- Tool `whm_cpanel_get_dns_zone_records` retornou 25.100+ tokens ao consultar `dominio.com.br`
 - Causado por centenas de subdomínios aninhados (padrão comum no WHM/cPanel)
 - Timeout em IAs com janelas pequenas de contexto
 - Impossibilidade de trabalhar com zonas grandes
 
 **Causa Raiz:**
 No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um subdomínio aninhado:
-- **Exemplo:** Conta `skillsit.com.br` + registra `cliente.com.br` = cria `cliente.skillsit.com.br`
+- **Exemplo:** Conta `dominio.com.br` + registra `cliente.com.br` = cria `cliente.dominio.com.br`
 - Isso é comportamento **COMUM** e precisa ser detectado preventivamente
 
 **Solução Implementada:**
@@ -41,23 +41,23 @@ No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um sub
 
 ### Contexto Técnico
 
-**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou **25.100+ tokens** ao consultar zona `skillsit.com.br`, excedendo capacidade de muitas IAs.
+**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou **25.100+ tokens** ao consultar zona `dominio.com.br`, excedendo capacidade de muitas IAs.
 
 **Por que aconteceu:**
 
 No WHM/cPanel, o gerenciamento de domínios cria automaticamente subdomínios aninhados:
 
-1. **Conta principal:** `skillsit.com.br`
+1. **Conta principal:** `dominio.com.br`
 2. **Cliente adicionado:** `cliente.com.br` (addon domain)
-3. **Resultado automático:** cPanel cria `cliente.skillsit.com.br` (subdomínio)
+3. **Resultado automático:** cPanel cria `cliente.dominio.com.br` (subdomínio)
 
 Exemplo real:
 ```
-skillsit.com.br (domínio base)
-├── tools.skillsit.com.br (subdomínio aninhado)
-├── cliente1.skillsit.com.br (addon domain automático)
-├── cliente2.skillsit.com.br (addon domain automático)
-├── google.skillsit.com.br (addon domain automático)
+dominio.com.br (domínio base)
+├── tools.dominio.com.br (subdomínio aninhado)
+├── cliente1.dominio.com.br (addon domain automático)
+├── cliente2.dominio.com.br (addon domain automático)
+├── google.dominio.com.br (addon domain automático)
 └── ... (287+ subdomínios de nível 1)
 ```
 
@@ -120,7 +120,7 @@ generateKey(zone, op, filters) // Gera chave única baseada em parâmetros
 
 ```javascript
 // Exemplo: dns.get_zone com cache
-const cacheKey = dnsCache.generateKey('skillsit.com.br', 'get_zone', {
+const cacheKey = dnsCache.generateKey('dominio.com.br', 'get_zone', {
   record_type: 'A',
   max_records: 100
 });
@@ -132,7 +132,7 @@ if (cached) {
 }
 
 // Cache miss: Buscar da WHM API
-const result = await this.whm.getZone('skillsit.com.br');
+const result = await this.whm.getZone('dominio.com.br');
 
 // Armazenar no cache por 120 segundos
 dnsCache.set(cacheKey, result);
@@ -181,7 +181,7 @@ const { validateRecordType, validateDomainName, validateTTL } = require('./valid
 const type = validateRecordType('a'); // Retorna 'A'
 
 // Valida domínio
-const domain = validateDomainName('skillsit.com.br'); // Retorna 'skillsit.com.br'
+const domain = validateDomainName('dominio.com.br'); // Retorna 'dominio.com.br'
 
 // Valida e aplica default TTL
 const ttl = validateTTL(null); // Retorna 14400 (4 horas)
@@ -210,9 +210,9 @@ validateTTL(30); // Lança Error: "TTL inválido: deve estar entre 60 e 604800"
 const { parseZoneRecords, extractRecordsByType, groupRecordsByLevel } = require('./parser');
 
 // 1. Parsear resposta bruta da WHM
-const rawData = await whm.getZone('skillsit.com.br');
+const rawData = await whm.getZone('dominio.com.br');
 const records = parseZoneRecords(rawData.data.zone[0]);
-// Retorna: [{line: 1, type: 'A', name: 'skillsit.com.br', value: '192.168.1.1', ttl: 14400}, ...]
+// Retorna: [{line: 1, type: 'A', name: 'dominio.com.br', value: '192.168.1.1', ttl: 14400}, ...]
 
 // 2. Filtrar apenas registros A
 const onlyA = extractRecordsByType(records, 'A');
@@ -220,15 +220,15 @@ const onlyA = extractRecordsByType(records, 'A');
 
 // 3. Filtrar apenas registros 'www'
 const www = extractRecordsByName(records, 'www', 'exact');
-// Retorna: [{name: 'www.skillsit.com.br', ...}]
+// Retorna: [{name: 'www.dominio.com.br', ...}]
 
 // 4. Agrupar por nível de aninhamento
-const levels = groupRecordsByLevel(records, 'skillsit.com.br');
+const levels = groupRecordsByLevel(records, 'dominio.com.br');
 // Retorna: {
-//   base: [...],         // skillsit.com.br, @
-//   level1: [...],       // www.skillsit.com.br, tools.skillsit.com.br
-//   level2: [...],       // app.tools.skillsit.com.br
-//   level3plus: [...]    // deep.nested.app.tools.skillsit.com.br
+//   base: [...],         // dominio.com.br, @
+//   level1: [...],       // www.dominio.com.br, tools.dominio.com.br
+//   level2: [...],       // app.tools.dominio.com.br
+//   level3plus: [...]    // deep.nested.app.tools.dominio.com.br
 // }
 ```
 
@@ -268,19 +268,19 @@ detectNestedDomains(zoneRecords, baseDomain)
 
 ```javascript
 {
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   hasNested: true,
   totalRecords: 342,
   byLevel: {
-    base: 12,        // skillsit.com.br, @
-    level1: 287,     // tools.skillsit.com.br, cliente.skillsit.com.br
-    level2: 38,      // app.tools.skillsit.com.br
-    level3plus: 5    // deep.nested.app.tools.skillsit.com.br
+    base: 12,        // dominio.com.br, @
+    level1: 287,     // tools.dominio.com.br, cliente.dominio.com.br
+    level2: 38,      // app.tools.dominio.com.br
+    level3plus: 5    // deep.nested.app.tools.dominio.com.br
   },
   warning: "⚠️ Zona com muitos subdomínios (287 registros de nível 1) - use filtros ou whm_cpanel_search_dns_record!",
   examples: {
-    level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
-    level2: ["app.tools.skillsit.com.br"],
+    level1: ["tools.dominio.com.br", "cliente.dominio.com.br", "google.dominio.com.br"],
+    level2: ["app.tools.dominio.com.br"],
     level3plus: []
   },
   recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos ou whm_cpanel_get_dns_zone_records com filtros"
@@ -300,7 +300,7 @@ detectNestedDomains(zoneRecords, baseDomain)
 ```javascript
 const { detectNestedDomains } = require('./nested-domain-detector');
 
-const analysis = detectNestedDomains(records, 'skillsit.com.br');
+const analysis = detectNestedDomains(records, 'dominio.com.br');
 
 if (analysis.hasNested) {
   console.log(analysis.warning);
@@ -522,7 +522,7 @@ isValidRecordType(type)       // Valida tipo de registro DNS
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     records: [...],  // filtrados/limitados
     totalRecords: 342,
     returnedRecords: 50,
@@ -542,8 +542,8 @@ isValidRecordType(type)       // Valida tipo de registro DNS
       },
       warning: "⚠️ Zona com muitos subdomínios...",
       examples: {
-        level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br"],
-        level2: ["app.tools.skillsit.com.br"]
+        level1: ["tools.dominio.com.br", "cliente.dominio.com.br"],
+        level2: ["app.tools.dominio.com.br"]
       }
     },
     suggestions: [  // se zona precisa otimização
@@ -551,7 +551,7 @@ isValidRecordType(type)       // Valida tipo de registro DNS
         severity: "high",
         message: "Zona possui 287 subdomínios de nível 1",
         action: "Use whm_cpanel_search_dns_record para buscar registros específicos",
-        example: "whm_cpanel_search_dns_record({ zone: 'skillsit.com.br', name: 'prometheus', type: ['A'] })"
+        example: "whm_cpanel_search_dns_record({ zone: 'dominio.com.br', name: 'prometheus', type: ['A'] })"
       }
     ]
   }
@@ -580,7 +580,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "params": {
       "name": "dns.get_zone",
       "arguments": {
-        "zone": "skillsit.com.br",
+        "zone": "dominio.com.br",
         "record_type": "A",
         "max_records": 100,
         "include_stats": true
@@ -604,7 +604,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 
 | Parâmetro | Tipo | Obrigatório | Descrição |
 |-----------|------|-------------|-----------|
-| `zone` | string | ✅ Sim | Domínio a verificar (ex: skillsit.com.br) |
+| `zone` | string | ✅ Sim | Domínio a verificar (ex: dominio.com.br) |
 
 **Retorno:**
 
@@ -612,19 +612,19 @@ curl -X POST http://mcp.example.com:3200/mcp \
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     hasNested: true,
     totalRecords: 342,
     byLevel: {
-      base: 12,      // skillsit.com.br, @
-      level1: 287,   // tools.skillsit.com.br, cliente.skillsit.com.br
-      level2: 38,    // app.tools.skillsit.com.br
-      level3plus: 5  // deep.nested.app.tools.skillsit.com.br
+      base: 12,      // dominio.com.br, @
+      level1: 287,   // tools.dominio.com.br, cliente.dominio.com.br
+      level2: 38,    // app.tools.dominio.com.br
+      level3plus: 5  // deep.nested.app.tools.dominio.com.br
     },
     warning: "⚠️ Zona com muitos subdomínios - use filtros ou whm_cpanel_search_dns_record!",
     examples: {
-      level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
-      level2: ["app.tools.skillsit.com.br"],
+      level1: ["tools.dominio.com.br", "cliente.dominio.com.br", "google.dominio.com.br"],
+      level2: ["app.tools.dominio.com.br"],
       level3plus: []
     },
     recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos ou whm_cpanel_get_dns_zone_records com filtros",
@@ -633,13 +633,13 @@ curl -X POST http://mcp.example.com:3200/mcp \
         severity: "high",
         message: "Zona possui 287 subdomínios de nível 1",
         action: "Use whm_cpanel_search_dns_record para buscar registros específicos em vez de obter toda a zona",
-        example: "whm_cpanel_search_dns_record({ zone: \"skillsit.com.br\", name: \"prometheus\", type: [\"A\", \"AAAA\"] })"
+        example: "whm_cpanel_search_dns_record({ zone: \"dominio.com.br\", name: \"prometheus\", type: [\"A\", \"AAAA\"] })"
       },
       {
         severity: "medium",
         message: "Zona contém 342 registros no total",
         action: "Use filtros em whm_cpanel_get_dns_zone_records para limitar quantidade de registros retornados",
-        example: "whm_cpanel_get_dns_zone_records({ zone: \"skillsit.com.br\", record_type: \"A\", max_records: 100 })"
+        example: "whm_cpanel_get_dns_zone_records({ zone: \"dominio.com.br\", record_type: \"A\", max_records: 100 })"
       }
     ]
   }
@@ -663,7 +663,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "method":"tools/call",
     "params": {
       "name": "dns.check_nested_domains",
-      "arguments": {"zone": "skillsit.com.br"}
+      "arguments": {"zone": "dominio.com.br"}
     },
     "id":1
   }'
@@ -694,7 +694,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     searchCriteria: {
       name: "prometheus",
       types: ["A", "AAAA"],
@@ -989,7 +989,7 @@ DNS_CACHE_TTL_SECONDS=120 # Comentário inline
 
 | Métrica | ANTES | DEPOIS | Melhoria |
 |---------|-------|--------|----------|
-| **Tokens (skillsit.com.br - zona completa)** | 25.100 | 500-2.000 | **-90% a -98%** |
+| **Tokens (dominio.com.br - zona completa)** | 25.100 | 500-2.000 | **-90% a -98%** |
 | **Tokens (busca de registro específico)** | 25.100 | 500 | **-98%** |
 | **Tempo de resposta (1ª chamada)** | ~2s | ~2s | 0% (primeira vez) |
 | **Tempo de resposta (cache hit)** | ~2s | ~10ms | **-99.5%** |
@@ -1098,7 +1098,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "method":"tools/call",
     "params": {
       "name": "dns.check_nested_domains",
-      "arguments": {"zone": "skillsit.com.br"}
+      "arguments": {"zone": "dominio.com.br"}
     },
     "id":1
   }'
@@ -1146,7 +1146,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "params": {
       "name": "dns.get_zone",
       "arguments": {
-        "zone": "skillsit.com.br",
+        "zone": "dominio.com.br",
         "record_type": "A",
         "max_records": 50,
         "include_stats": true
@@ -1189,7 +1189,7 @@ pm2 logs mcp-whm --err --lines 100
 
 ```javascript
 // 1. Verificar estrutura
-const analysis = await dns.check_nested_domains({ zone: "skillsit.com.br" });
+const analysis = await dns.check_nested_domains({ zone: "dominio.com.br" });
 
 if (analysis.hasNested) {
   console.log(analysis.warning);
@@ -1199,13 +1199,13 @@ if (analysis.hasNested) {
   if (analysis.byLevel.level1 > 100) {
     // Usar busca otimizada
     const result = await dns.search_record({
-      zone: "skillsit.com.br",
+      zone: "dominio.com.br",
       name: "prometheus"
     });
   } else {
     // Usar get_zone com filtros
     const result = await dns.get_zone({
-      zone: "skillsit.com.br",
+      zone: "dominio.com.br",
       record_type: "A",
       max_records: 100
     });
@@ -1223,7 +1223,7 @@ if (analysis.hasNested) {
 
 ```javascript
 const result = await dns.search_record({
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   name: "prometheus",
   type: ["A", "AAAA"],
   matchMode: "exact"
@@ -1231,7 +1231,7 @@ const result = await dns.search_record({
 
 if (result.found) {
   console.log(`Encontrados ${result.matches.length} registros`);
-  // matches = [{type: 'A', name: 'prometheus.skillsit.com.br', value: '192.168.1.1', ...}]
+  // matches = [{type: 'A', name: 'prometheus.dominio.com.br', value: '192.168.1.1', ...}]
 } else {
   console.log(result.message);
   // "Nenhum registro encontrado com o nome 'prometheus'"
@@ -1248,7 +1248,7 @@ if (result.found) {
 
 ```javascript
 const result = await dns.get_zone({
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   record_type: "MX",
   max_records: 100
 });
@@ -1272,7 +1272,7 @@ result.records.forEach(mx => {
 
 ```javascript
 const result = await dns.get_zone({
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   include_stats: true,
   max_records: 50
 });
@@ -1341,10 +1341,10 @@ Mantém compatibilidade total com código existente:
 
 ```javascript
 // ANTES (retrocompatível)
-await dnsService.getZone('skillsit.com.br');
+await dnsService.getZone('dominio.com.br');
 
 // DEPOIS (com novos recursos)
-await dnsService.getZone('skillsit.com.br', {
+await dnsService.getZone('dominio.com.br', {
   record_type: 'A',
   max_records: 100,
   include_stats: true
@@ -1416,7 +1416,7 @@ Implementar `page` e `per_page` em `dns.get_zone`:
 
 ```javascript
 {
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   page: 2,
   per_page: 50,
   total_pages: 7,
@@ -1434,8 +1434,8 @@ Implementar `page` e `per_page` em `dns.get_zone`:
 **3. Métricas Prometheus**
 
 ```javascript
-dns_cache_hit_rate{zone="skillsit.com.br"} 0.95
-dns_nested_detection_count{zone="skillsit.com.br"} 287
+dns_cache_hit_rate{zone="dominio.com.br"} 0.95
+dns_nested_detection_count{zone="dominio.com.br"} 287
 dns_filter_usage{type="record_type"} 145
 ```
 

@@ -8,10 +8,10 @@
 
 ## Problema Resolvido
 
-**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou 25k+ tokens ao consultar `skillsit.com.br` (centenas de subdomínios)
+**Situação:** Tool `whm_cpanel_get_dns_zone_records` retornou 25k+ tokens ao consultar `dominio.com.br` (centenas de subdomínios)
 
 **Causa Raiz:** No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um subdomínio aninhado:
-- Exemplo: Conta `skillsit.com.br` + registra `cliente.com.br` = cria `cliente.skillsit.com.br`
+- Exemplo: Conta `dominio.com.br` + registra `cliente.com.br` = cria `cliente.dominio.com.br`
 - Isso é COMUM e precisa ser detectado e tratado preventivamente
 
 **Solução:** Implementação completa de sistema de detecção, busca otimizada, cache de 120s e filtros
@@ -163,7 +163,7 @@
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     records: [...],  // filtrados/limitados
     totalRecords: 342,
     returnedRecords: 50,
@@ -195,19 +195,19 @@
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     hasNested: true,
     totalRecords: 342,
     byLevel: {
-      base: 12,      // skillsit.com.br
-      level1: 287,   // tools.skillsit.com.br, cliente.skillsit.com.br
-      level2: 38,    // app.tools.skillsit.com.br
-      level3plus: 5  // deep.nested.app.tools.skillsit.com.br
+      base: 12,      // dominio.com.br
+      level1: 287,   // tools.dominio.com.br, cliente.dominio.com.br
+      level2: 38,    // app.tools.dominio.com.br
+      level3plus: 5  // deep.nested.app.tools.dominio.com.br
     },
     warning: "⚠️ Zona com muitos subdomínios - use filtros ou whm_cpanel_search_dns_record!",
     examples: {
-      level1: ["tools.skillsit.com.br", "cliente.skillsit.com.br", "google.skillsit.com.br"],
-      level2: ["app.tools.skillsit.com.br"],
+      level1: ["tools.dominio.com.br", "cliente.dominio.com.br", "google.dominio.com.br"],
+      level2: ["app.tools.dominio.com.br"],
       level3plus: []
     },
     recommendation: "Use whm_cpanel_search_dns_record para buscar registros específicos",
@@ -243,7 +243,7 @@
 {
   success: true,
   data: {
-    zone: "skillsit.com.br",
+    zone: "dominio.com.br",
     searchCriteria: {
       name: "prometheus",
       types: ["A", "AAAA"],
@@ -372,7 +372,7 @@ curl -X POST http://localhost:3200/mcp \
     "params": {
       "name": "dns.check_nested_domains",
       "arguments": {
-        "zone": "skillsit.com.br"
+        "zone": "dominio.com.br"
       }
     },
     "id":1
@@ -391,7 +391,7 @@ curl -X POST http://localhost:3200/mcp \
     "params": {
       "name": "dns.search_record",
       "arguments": {
-        "zone": "skillsit.com.br",
+        "zone": "dominio.com.br",
         "name": "prometheus",
         "type": ["A", "AAAA"],
         "matchMode": "exact"
@@ -413,7 +413,7 @@ curl -X POST http://localhost:3200/mcp \
     "params": {
       "name": "dns.get_zone",
       "arguments": {
-        "zone": "skillsit.com.br",
+        "zone": "dominio.com.br",
         "record_type": "A",
         "max_records": 100,
         "include_stats": true
@@ -462,7 +462,7 @@ curl -X POST http://localhost:3200/mcp \
 ### 1. Verificar se zona tem aninhamento
 ```javascript
 // Tool: dns.check_nested_domains
-{ zone: "skillsit.com.br" }
+{ zone: "dominio.com.br" }
 
 // Retorno:
 // - hasNested: true/false
@@ -475,7 +475,7 @@ curl -X POST http://localhost:3200/mcp \
 ```javascript
 // Tool: dns.search_record
 {
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   name: "prometheus",
   type: ["A", "AAAA"],
   matchMode: "exact"
@@ -489,7 +489,7 @@ curl -X POST http://localhost:3200/mcp \
 ```javascript
 // Tool: dns.get_zone
 {
-  zone: "skillsit.com.br",
+  zone: "dominio.com.br",
   record_type: "A",           // apenas registros A
   max_records: 100,           // limitar a 100
   include_stats: true         // incluir análise de aninhamento

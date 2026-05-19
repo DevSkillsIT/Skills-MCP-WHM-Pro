@@ -293,7 +293,7 @@ export MCP_SAFETY_TOKEN="CHANGE_ME_CONFIRMATION"
 ### AC01: Health Check Funcional
 ```bash
 curl -X GET $MCP_HOST/health
-# Esperado: status=healthy, service=mcp-whm-cpanel, version=1.0.0
+# Esperado: status=healthy, service=mcp-whm-cpanel, version=2.0.0
 ```
 
 ### AC01b: Autenticação Obrigatória

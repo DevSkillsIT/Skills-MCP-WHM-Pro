@@ -7,6 +7,58 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.0.0] - 2026-05-19
+
+### ⚠️ BREAKING CHANGES
+
+- **Removidas as tools `whm_cpanel_list_server_prompts` e `whm_cpanel_get_analysis_prompt`**: retornavam apenas templates literais com placeholders X/Y/Z. Substituídas pela nova tool `whm_cpanel_generate_report` que retorna dados reais coletados ao vivo do servidor.
+- **Tool count: 16 → 15** (12 core + 3 utility)
+- **MCP Prompts nativos**: `prompts/list` e `prompts/get` mantidos funcionais e agora delegam internamente para `reports.js`, retornando dados reais ao invés de templates.
+
+### Adicionado
+
+- 🆕 **Tool `whm_cpanel_generate_report`** — gerador de 15 relatórios com DADOS REAIS:
+  - **Gestor (7)**: `whm_account_health_summary`, `whm_resource_usage_trends` (com projeção linear de ETA até 90%), `whm_security_posture`, `whm_ssl_certificate_inventory` (via `whmapi1 fetch_ssl_vhosts`), `whm_backup_coverage` (via `jetbackup5api listBackupJobs`), `whm_dns_zone_health`, `whm_email_deliverability`
+  - **Analista (8)**: `whm_account_quick_lookup`, `whm_dns_troubleshooting`, `whm_email_setup_guide`, `whm_ssl_installation_guide`, `whm_website_down_investigation`, `whm_disk_usage_alert` (via SSH `du -sh`), `whm_domain_migration_checklist`, `whm_backup_restore_guide`
+- 🆕 **Módulo `src/lib/reports.js`** (~900 linhas) com dispatcher, 15 geradores e helpers (`extractZoneRecords`, `getServiceStatusWithFallback`)
+- 🆕 **Wrapper de erros `enrichWHMError`** com 8 padrões mapeados (Account/Zone/User/Domain not-found, Resource busy, Parse Error, etc.) que sugere ação alternativa
+- 🆕 **Projeção linear de ETA** em `resource_usage_trends`: taxa média por conta + agregada do servidor + "contas em risco"
+- 🆕 **Coluna `Disco Usado/Limite`** em listings com valores humanizados (KB/MB/GB/TB)
+- 🆕 **Warning de clamping** quando paginate reduz `limit` > 50
+
+### Corrigido
+
+- 🐛 `formatLogLines` retornava JSON cru envolto em truncate (não extraía `d.lines`)
+- 🐛 `formatSystemLoad` mostrava apenas load avg (CPU/Memória/Disco N/A) — agora mapeia payload SSH completo
+- 🐛 `formatServerStatus` `Uptime: N/A` — agora coleta via SSH `uptime -p`
+- 🐛 `formatAccountDetail` mostrava `Senha N/A` desnecessariamente e formato corrompido de `startdate` (`17 Aug 30 16:52` → `2017-08-30 16:52:00`)
+- 🐛 `formatAccountDomains` classificava todos os domínios como `subdomain` — agora usa metadata real (`main_domain`/`sub_domains`/`addon_domains`/`parked_domains`)
+- 🐛 `formatDomainsList` classificava tudo como `main` — agora normaliza `domain_type` do `get_domain_info`
+- 🐛 `searchType=addons` retornava vazio — agora usa `get_domain_info` filtrado por user+tipo (8 addons detectados em conta-exemplo)
+- 🐛 `resolve_ip` retornava template `Dominio: N/A` — novo `formatResolveIp` específico
+- 🐛 `list_conversions` e `nested_subdomains` retornavam "Operação realizada com sucesso" sem dados — formatters específicos criados
+- 🐛 `whm://server/config` retornava conteúdo de status (load dinâmico) — agora retorna apenas dados estáticos via novo `formatServerConfig`
+- 🐛 `searchType=owner` retornava template `data` com campos vazios — novo `formatDomainOwner`
+- 🐛 `searchType=authority` retornava formato ambíguo — novo `formatDomainAuthority` com Sim/Não + nameservers
+- 🐛 Pseudo-registros `:RAW` / `$TTL` apareciam como registros DNS no listing — filtrados com nota de rodapé
+- 🐛 Ordenação inconsistente entre chamadas idênticas — sort determinístico em `formatAccountsList`/`formatDomainsList`
+- 🐛 Tamanho de arquivos em bytes raw e modificado em Unix epoch — agora humanizados (KB/MB/GB e ISO UTC)
+- 🐛 `alias_check` e `get_ds_records` erros crus — agora retornam mensagens orientativas com endpoint alternativo
+- 🐛 `package.json` afirmava "23 tools" — corrigido para "15 tools"
+
+### Segurança
+
+- 🔒 **Anonimização de exemplos didáticos**: substituídos `skillsit.com.br`/`smartskills.com.br`/`grupowink.com`/`skillsitcom` por placeholders neutros (`dominio.com.br`, `outrodominio.com.br`, `nameserver.com.br`, `usuariocpanel`) em descriptions de tools e JSDoc visíveis via `tools/list`
+- 🔒 `.gitignore` agora ignora `.local-docs/`, `AUDIT-*.md`, `POSTMORTEM-*.md` (documentos operacionais com dados de infra real)
+- 🔒 Auditoria pré-commit confirmou: zero tokens/passwords/API keys hardcoded; `.env` e `*.pem`/`*.ppk`/`*.key` ignorados; IP real e hostname interno fora de qualquer arquivo committado
+
+### Testes
+
+- ✅ **737/737 testes** passando (unit + contract + integration)
+- ✅ Contract tests atualizados para refletir tool count 16 → 15
+
+---
+
 ## [1.5.1] - 2026-02-09
 
 ### Modificado
@@ -43,7 +95,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 - ✅ Total de 48 tools (incremento de 3 tools)
 
 ### Corrigido
-- 🐛 Timeout em consultas DNS de zonas grandes (skillsit.com.br)
+- 🐛 Timeout em consultas DNS de zonas grandes (dominio.com.br como exemplo)
 - 🐛 Memory leaks em suite de testes (setup.js global)
 - 🐛 Inconsistência de portas entre templates (3100 vs 3200)
 

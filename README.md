@@ -43,9 +43,10 @@
 
 ### What's New in v2.0.0
 
-- **Consolidated Tool Architecture**: 44 individual tools consolidated to 16 unified tools with search_*/manage_* pattern
+- **Consolidated Tool Architecture**: 44+ individual tools consolidated to **15 unified tools** (12 core + 3 utility) with search_*/manage_* pattern
+- **Live Report Generation**: New tool `whm_cpanel_generate_report` returns 15 reports with real data (no placeholders) — replaces the deprecated `whm_cpanel_list_server_prompts` and `whm_cpanel_get_analysis_prompt`
 - **Markdown Response Format**: All tools return Markdown tables instead of raw JSON (50-81% token reduction)
-- **Comprehensive Tool Annotations**: All 16 tools include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint
+- **Comprehensive Tool Annotations**: All 15 tools include readOnlyHint, destructiveHint, idempotentHint, and openWorldHint
 - **Server Instructions**: Initialize returns 1265 characters of detailed instructions
 - **Token Optimization**: Markdown responses reduce token consumption by 50-81% vs JSON
 - **Updated Protocol**: MCP protocol version 2025-11-25 (was 2024-11-05)
@@ -72,9 +73,9 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 
 | Feature | Skills MCP WHM Pro v2.0.0 | whmrockstar | Others |
 |---------|---------------------------|-------------|--------|
-| **Consolidated Tools** | ✅ 16 unified (12 core + 4 utility) | ⚠️ 11 tools | ❌ Limited |
+| **Consolidated Tools** | ✅ 15 unified (12 core + 3 utility) | ⚠️ 11 tools | ❌ Limited |
 | **Response Format** | ✅ Markdown tables (50-81% token reduction) | ❌ Raw JSON | ❌ Raw JSON |
-| **Tool Annotations** | ✅ All 16 tools (readonly/destructive/idempotent) | ❌ None | ❌ None |
+| **Tool Annotations** | ✅ All 15 tools (readonly/destructive/idempotent) | ❌ None | ❌ None |
 | **DNS Optimistic Locking** | ✅ Yes | ❌ No | ❌ No |
 | **Safety Guard System** | ✅ Yes | ❌ No | ❌ No |
 | **Configurable Timeouts** | ✅ Yes | ⚠️ Fixed | ❌ No |
@@ -87,7 +88,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 ### What Makes Us Different
 
 2. **Token-Optimized Responses** - Markdown tables reduce token consumption by 50-81% vs raw JSON
-3. **Comprehensive Annotations** - All 16 tools include security hints and capability metadata
+3. **Comprehensive Annotations** - All 15 tools include security hints and capability metadata
 5. **Security-First** - Multiple layers of protection with annotated destructive operations
 6. **Developer-Friendly** - Server instructions, CLI tools, and IDE integration
 7. **Modern Stack** - Latest Node.js, Express, and MCP protocol v2025-11-25 standards
@@ -108,7 +109,7 @@ Model Context Protocol (MCP) is an open standard that enables AI assistants to s
 - **DNS Cache Invalidation** - Automatic cache cleanup after create/update/delete operations
 - **Optimized Timeouts** - Configurable per-operation timeouts with NSEC3 dynamic calculation
 - **Robust Safety Guard** - Comprehensive token validation and reason enforcement for all destructive operations
-- **Complete Tool Consolidation** - 44+ tools → 16 unified search_*/manage_* pattern with clear separation
+- **Complete Tool Consolidation** - 44+ tools → 15 unified search_*/manage_* pattern with clear separation
 
 ### 🌐 Domain & DNS Extensions (SPEC-NOVAS-FEATURES-WHM-001)
 
@@ -439,19 +440,19 @@ curl -X POST http://localhost:3100/mcp \
 
 ---
 
-## 🛠️ Available Tools (16)
+## 🛠️ Available Tools (15)
 
 ### Tool Architecture (v2.0.0)
 
-After 28+ bug fixes and comprehensive validation, the v2.0.0 release consolidates 44+ individual tools into **16 unified tools** using an intelligent search_*/manage_* consolidation pattern:
+After 50+ bug fixes and comprehensive validation, the v2.0.0 release consolidates 44+ individual tools into **15 unified tools** using an intelligent search_*/manage_* consolidation pattern, plus a new live-data report generator:
 
 **Architecture Summary:**
 - **12 Core Tools**: Complete WHM/cPanel operations (search + manage pairs for dual-purpose operations)
-- **4 Utility Tools**: Server resources, prompts, and analysis helpers
+- **3 Utility Tools**: Server resources + `whm_cpanel_generate_report` for 15 reports with REAL data
 - **Markdown Responses**: All tools return Markdown tables for **50-81% token reduction** vs. raw JSON
 - **Tool Annotations**: Every tool includes `readOnlyHint`, `destructiveHint`, `idempotentHint`, `openWorldHint` for AI safety
-- **Smart Pagination**: Default limit=25 (max=50) for all search operations with `has_more` and `next_offset` metadata
-- **Bug Fixes**: 28+ production fixes including SSH fallback, DNS caching, timeout optimization, safety guard improvements
+- **Smart Pagination**: Default limit=25 (max=50) for all search operations with clamping warnings
+- **Bug Fixes**: 50+ production fixes including SSH fallback, DNS caching, timeout optimization, JetBackup5 integration, AutoSSL inventory
 
 ### Core Tools (12)
 
@@ -495,15 +496,15 @@ After 28+ bug fixes and comprehensive validation, the v2.0.0 release consolidate
 | `whm_cpanel_search_account_files` | search | List or read files in cPanel account | Markdown table |
 | `whm_cpanel_manage_account_files` | manage | Write or delete account files with SafetyGuard | Markdown table |
 
-### Utility Tools (4)
-
+### Utility Tools (3)
 
 | Tool | Description | Response Type |
 |------|-------------|----------------|
 | `whm_cpanel_list_server_resources` | List available MCP server resources (whm://server/config, whm://server/status) | JSON |
 | `whm_cpanel_read_server_resource` | Read MCP resource content (config or status) | Text/Markdown |
-| `whm_cpanel_list_server_prompts` | List available automation prompts (15 total: 7 manager + 8 analyst) | JSON |
-| `whm_cpanel_get_analysis_prompt` | Get detailed prompt template with instructions | Text |
+| `whm_cpanel_generate_report` | Generate one of 15 reports with **real data** (no placeholders): account_health_summary, resource_usage_trends (with linear ETA projection), security_posture, ssl_certificate_inventory (via `whmapi1 fetch_ssl_vhosts`), backup_coverage (via `jetbackup5api`), dns_zone_health, email_deliverability, account_quick_lookup, dns_troubleshooting, email_setup_guide, ssl_installation_guide, website_down_investigation, disk_usage_alert (via SSH `du -sh`), domain_migration_checklist, backup_restore_guide | Markdown |
+
+> **Migration note**: The deprecated `whm_cpanel_list_server_prompts` and `whm_cpanel_get_analysis_prompt` tools were removed in v2.0.0. The MCP native `prompts/list` and `prompts/get` protocol endpoints remain functional and internally delegate to `generate_report`, so existing consumers using the MCP prompt protocol continue to work and now receive real data instead of templates.
 
 ---
 
@@ -539,31 +540,31 @@ npx skills-whm-mcp help
 ### Example Output: introspect (v2.0.0)
 
 ```
-Available MCP Tools (16 total):
+Available MCP Tools (15 total):
 
 CORE TOOLS (12):
  1. whm_cpanel_search_hosting_accounts  - Search/list cPanel accounts with pagination
  2. whm_cpanel_manage_hosting_accounts  - Create/suspend/unsuspend/delete accounts
- 3. whm_cpanel_search_server_status     - Get server status and service health
+ 3. whm_cpanel_search_server_status     - Get server status (with uptime via SSH) and services
  4. whm_cpanel_manage_server_service    - Restart services with SafetyGuard
- 5. whm_cpanel_search_hosted_domains    - Search domains by ownership/type
- 6. whm_cpanel_manage_hosted_domains    - Create/delete aliases/subdomains
+ 5. whm_cpanel_search_hosted_domains    - Search domains (typed: main/addon/subdomain/parked)
+ 6. whm_cpanel_manage_hosted_domains    - Create/delete aliases/subdomains, resolve IP
  7. whm_cpanel_manage_dnssec_settings   - Manage DNSSEC and NSEC3
- 8. whm_cpanel_search_dns_zone_records  - Search DNS zones and records
+ 8. whm_cpanel_search_dns_zone_records  - Search DNS zones (pseudo-records :RAW/$TTL filtered)
  9. whm_cpanel_manage_dns_zone_records  - Create/update/delete DNS records
-10. whm_cpanel_manage_system_services   - Manage services and read logs
-11. whm_cpanel_search_account_files     - Search and list account files
+10. whm_cpanel_manage_system_services   - Get system load (CPU/RAM/disk), read logs
+11. whm_cpanel_search_account_files     - Search files (humanized sizes and dates)
 12. whm_cpanel_manage_account_files     - Write/delete account files
 
-UTILITY TOOLS (4):
+UTILITY TOOLS (3):
 13. whm_cpanel_list_server_resources    - List MCP resources (config, status)
 14. whm_cpanel_read_server_resource     - Read resource content (Markdown)
-15. whm_cpanel_list_server_prompts      - List 15 available automation prompts
-16. whm_cpanel_get_analysis_prompt      - Get prompt template with instructions
+15. whm_cpanel_generate_report          - Generate one of 15 reports with REAL data
 
-Response Format: All 16 tools return Markdown tables (50-81% token reduction vs JSON)
-Pagination: Default limit=25, max=50 on all search tools
+Response Format: All 15 tools return Markdown tables (50-81% token reduction vs JSON)
+Pagination: Default limit=25, max=50 on all search tools (with clamping warning)
 Annotations: All tools include readOnlyHint, destructiveHint, idempotentHint, openWorldHint
+Errors: Enriched with actionable hints (8 patterns mapped) for Account/Zone/User/Domain not-found cases
 ```
 
 ---
@@ -635,7 +636,7 @@ Skills MCP WHM Pro is designed to work with natural language:
 "Edit the A record for api.exemplo.com.br to 198.51.100.10 using optimistic lock"
 "Reset the DNS zone for lab.exemplo.com.br after taking a backup"
 "Delete the CNAME for old.exemplo.com.br with SafetyGuard token"
-"Check if skillsit.com.br has nested subdomains structure"
+"Check if dominio.com.br has nested subdomains structure"
 "Search for www record in example.com zone with exact match"
 ```
 
@@ -748,15 +749,19 @@ curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
   -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_server_resources","arguments":{}},"id":13}'
 ```
-- `whm_cpanel_list_server_prompts` (list 15 available prompts):
+- `whm_cpanel_generate_report` (generate one of 15 reports with real data — replaces deprecated list_server_prompts/get_analysis_prompt):
 ```bash
+# Account quick lookup with real data
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_list_server_prompts","arguments":{}},"id":14}'
-```
-- `whm_cpanel_get_analysis_prompt` (get prompt template with instructions):
-```bash
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_generate_report","arguments":{"name":"whm_account_quick_lookup","arguments":{"search_term":"usuariocpanel"}}},"id":14}'
+
+# Disk usage alert with SSH du breakdown
 curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
-  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_get_analysis_prompt","arguments":{"prompt":"whm_account_health_summary"}},"id":15}'
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_generate_report","arguments":{"name":"whm_disk_usage_alert","arguments":{"username":"usuariocpanel"}}},"id":15}'
+
+# SSL certificate inventory via whmapi1 fetch_ssl_vhosts
+curl -s -X POST $MCP_HOST/mcp -H "x-api-key: $MCP_API_KEY" \
+  -d '{"jsonrpc":"2.0","method":"tools/call","params":{"name":"whm_cpanel_generate_report","arguments":{"name":"whm_ssl_certificate_inventory"}},"id":16}'
 ```
 
 ### Composed Flows (multi-step)
@@ -911,7 +916,7 @@ npm run test:watch
 
 ### Markdown Tables vs JSON
 
-In v2.0.0, all 16 tools return Markdown tables instead of raw JSON, providing significant token reduction:
+In v2.0.0, all 15 tools return Markdown tables instead of raw JSON, providing significant token reduction:
 
 **Token Savings: 50-81% reduction**
 
@@ -949,20 +954,18 @@ These hints help AI assistants understand operation safety and decide on confirm
 
 ---
 
-## 🤖 Prompts MCP - Automação Inteligente para WHM/cPanel
+## 🤖 Relatórios e Prompts MCP - Automação Inteligente para WHM/cPanel
 
-O MCP WHM Pro inclui **15 prompts profissionais** que automatizam operações complexas e repetitivas, especialmente desenvolvidos para MSPs (Managed Service Providers). Os prompts orquestram múltiplas ferramentas em workflows multi-passo, com formato compacto para WhatsApp/Teams.
+O MCP WHM Pro inclui **15 relatórios profissionais** que coletam dados reais do servidor e geram análises completas em Markdown, especialmente desenvolvidos para MSPs (Managed Service Providers). Os relatórios orquestram múltiplas chamadas WHM API + SSH internamente e retornam respostas prontas para uso.
 
-### Acesso aos Prompts (v2.0.0)
+### Acesso aos Relatórios (v2.0.0)
 
-Os 15 prompts são acessíveis via 2 novas utility tools:
+Há **dois caminhos** para acessar os 15 relatórios:
 
-1. **`whm_cpanel_list_server_prompts`** - Retorna lista de todos os 15 prompts disponíveis com descrições
-2. **`whm_cpanel_get_analysis_prompt`** - Retorna template completo de um prompt específico com instruções detalhadas
+1. **Via tool `whm_cpanel_generate_report`** (recomendado): tools/call MCP padrão com `name` e `arguments`
+2. **Via MCP Prompts nativos** (`prompts/list` e `prompts/get`): mantidos para compatibilidade com clientes MCP que usam o protocolo de prompts; internamente delegam para o mesmo gerador de relatórios
 
-Além disso, todos os prompts são acessíveis como **MCP Resources**:
-- **`whm://server/prompts`** - Índice de prompts
-- **`whm://server/prompts/[nome]`** - Template de prompt específico
+> **⚠️ Migration v2.0.0**: As antigas tools `whm_cpanel_list_server_prompts` e `whm_cpanel_get_analysis_prompt` foram removidas. Elas retornavam apenas templates literais com placeholders. O novo `whm_cpanel_generate_report` retorna dados reais coletados ao vivo.
 
 ### Visão Geral dos Prompts
 
