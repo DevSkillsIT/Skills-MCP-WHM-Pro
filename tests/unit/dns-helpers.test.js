@@ -63,7 +63,7 @@ describe('DNS Validators', () => {
       expect(validateDomainName('example.com')).toBe('example.com');
       expect(validateDomainName('EXAMPLE.COM')).toBe('example.com');
       expect(validateDomainName('sub.example.com')).toBe('sub.example.com');
-      expect(validateDomainName('skillsit.com.br')).toBe('skillsit.com.br');
+      expect(validateDomainName('dominio.com.br')).toBe('dominio.com.br');
     });
 
     test('rejeita domínios inválidos', () => {

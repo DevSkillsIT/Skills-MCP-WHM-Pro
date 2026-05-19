@@ -1,7 +1,7 @@
 {
   "name": "skills-mcp-whm-pro",
-  "version": "1.0.0",
-  "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, and monitoring capabilities. Features include API Key authentication, DNS optimistic locking, Safety Guard, Prometheus metrics, and comprehensive toolset (23 tools).",
+  "version": "2.0.0",
+  "description": "Enterprise-grade MCP Server for WHM/cPanel management with advanced security, DNS management, monitoring, and live report generation. Features include API Key authentication, DNS optimistic locking, Safety Guard, Prometheus metrics, JetBackup5 + AutoSSL integration, and a consolidated toolset of 15 tools (12 core + 3 utility, including 15-report generator with real data).",
   "main": "src/server.js",
   "bin": {
     "skills-whm-mcp": "bin/cli.js"

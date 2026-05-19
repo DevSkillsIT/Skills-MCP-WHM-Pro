@@ -24,7 +24,7 @@ const mockAccounts = {
 describe('formatAccountsList()', () => {
   test('formata tabela Markdown com accounts', () => {
     const result = formatAccountsList(mockAccounts);
-    expect(result).toContain('| Username | Dominio | Email | Plano | Disco | Status |');
+    expect(result).toContain('| Username | Dominio | Email | Plano | Disco Usado/Limite | Status |');
     expect(result).toContain('user1');
     expect(result).toContain('Suspensa');
     expect(result).toContain('**2 resultados**');

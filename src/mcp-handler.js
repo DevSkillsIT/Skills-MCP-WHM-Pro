@@ -17,7 +17,7 @@ const SafetyGuard = require('./lib/safety-guard');
 const { measureToolExecution, recordError } = require('./lib/metrics');
 const { withOperationTimeout, withTimeout, TimeoutError } = require('./lib/timeout');
 const dnsSchema = require('./schemas/dns-tools.json');
-const { WHM_PROMPTS, handleWHMPrompt } = require('./prompts');
+const { enrichWHMError } = require('./lib/error-mapper');
 
 /**
  * GAP-IMP-02: Extrai token de segurança do body ou header
@@ -97,8 +97,7 @@ const TOOL_CATEGORIES = {
   'whm_cpanel_manage_account_files': 'file',
   'whm_cpanel_list_server_resources': 'utility',
   'whm_cpanel_read_server_resource': 'utility',
-  'whm_cpanel_list_server_prompts': 'utility',
-  'whm_cpanel_get_analysis_prompt': 'utility',
+  'whm_cpanel_generate_report': 'utility',
 };
 
 /**
@@ -121,7 +120,7 @@ function buildToolDefinitions() {
             enum: ['list', 'summary', 'domains'],
             description: 'list = tabela de todas as contas (username, dominio, disco, status). summary = detalhes completos de 1 conta (requer username). domains = todos os dominios de 1 conta (requer username)'
           },
-          username: { type: 'string', description: 'Username cPanel da conta. Obrigatorio para summary e domains. Ex: skillsitcom' },
+          username: { type: 'string', description: 'Username cPanel da conta. Obrigatorio para summary e domains. Ex: usuariocpanel' },
           limit: { type: 'integer', default: 25, description: 'Registros por pagina (default: 25, max: 50). Usado com searchType=list' },
           offset: { type: 'integer', default: 0, description: 'Pular N registros para paginacao. Usado com searchType=list' }
         },
@@ -142,7 +141,7 @@ function buildToolDefinitions() {
             description: 'create = nova conta (requer domain, password). suspend = suspender (requer reason). unsuspend = reativar. delete = remover permanente (requer confirm=true e confirmationToken)'
           },
           username: { type: 'string', description: 'Username cPanel (obrigatorio, max 16 chars alfanumericos)' },
-          domain: { type: 'string', description: 'Dominio principal FQDN. Obrigatorio para create. Ex: empresa.com.br' },
+          domain: { type: 'string', description: 'Dominio principal FQDN. Obrigatorio para create. Ex: dominio.com.br' },
           password: { type: 'string', description: 'Senha da conta (obrigatorio para create, minimo 8 caracteres)' },
           email: { type: 'string', description: 'Email de contato do proprietario. Recomendado para create' },
           package: { type: 'string', description: 'Nome do plano de hospedagem. Opcional para create (default: plano padrao do servidor)' },
@@ -215,9 +214,9 @@ function buildToolDefinitions() {
             enum: ['all', 'data', 'owner', 'addons', 'addon_details', 'authority'],
             description: 'all = listar todos (paginado). data = IP, PHP, docroot de 1 dominio (requer domain). owner = conta proprietaria (requer domain). addons = addon domains de 1 conta (requer username). addon_details = detalhe de addon (requer domain + username). authority = verificar se servidor e autoritativo DNS (requer domain)'
           },
-          domain: { type: 'string', description: 'Nome do dominio FQDN. Obrigatorio para data, owner, addon_details, authority. Ex: skillsit.com.br' },
-          username: { type: 'string', description: 'Username cPanel. Obrigatorio para addons e addon_details. Ex: skillsitcom' },
-          domain_filter: { type: 'string', description: 'Filtro por nome de dominio (substring, case-insensitive). Usado apenas com searchType=all. Ex: "wink" filtra grupowink.com' },
+          domain: { type: 'string', description: 'Nome do dominio FQDN. Obrigatorio para data, owner, addon_details, authority. Ex: dominio.com.br' },
+          username: { type: 'string', description: 'Username cPanel. Obrigatorio para addons e addon_details. Ex: usuariocpanel' },
+          domain_filter: { type: 'string', description: 'Filtro por nome de dominio (substring, case-insensitive). Usado apenas com searchType=all. Ex: "exemplo" filtra exemplo.com.br' },
           limit: { type: 'integer', default: 25, description: 'Registros por pagina (default: 25, max: 50). Usado com searchType=all' },
           offset: { type: 'integer', default: 0, description: 'Pular N registros. Usado com searchType=all' },
           filter: { type: 'string', enum: ['addon', 'alias', 'subdomain', 'main'], description: 'Filtrar por tipo de dominio. Usado com searchType=all. main=dominio principal, addon=dominio adicional, alias=dominio estacionado, subdomain=subdominio' }
@@ -240,7 +239,7 @@ function buildToolDefinitions() {
           },
           domain: { type: 'string', description: 'Dominio FQDN. Obrigatorio para create_alias, create_subdomain, delete, resolve_ip, create_conversion' },
           username: { type: 'string', description: 'Username cPanel proprietario. Obrigatorio para create_alias, create_subdomain, delete, create_conversion' },
-          subdomain: { type: 'string', description: 'Prefixo do subdominio SEM o dominio pai. Obrigatorio para create_subdomain. Ex: "blog" para blog.empresa.com.br' },
+          subdomain: { type: 'string', description: 'Prefixo do subdominio SEM o dominio pai. Obrigatorio para create_subdomain. Ex: "blog" para blog.dominio.com.br' },
           target_domain: { type: 'string', description: 'Dominio alvo para alias. Opcional, default: dominio principal da conta' },
           document_root: { type: 'string', description: 'Caminho do document root para subdominio. Opcional, auto-gerado se omitido' },
           type: { type: 'string', enum: ['addon', 'parked', 'subdomain'], description: 'Tipo do dominio a deletar. Obrigatorio para delete. addon=dominio adicional, parked=estacionado, subdomain=subdominio' },
@@ -265,7 +264,7 @@ function buildToolDefinitions() {
             enum: ['get_ds_records', 'enable_nsec3', 'disable_nsec3', 'get_status'],
             description: 'get_ds_records = obter chaves DS (requer domains, somente leitura). enable_nsec3 = ativar protecao (requer domains + confirmationToken). disable_nsec3 = desativar (requer domains + confirmationToken). get_status = consultar operacao (requer operation_id, somente leitura)'
           },
-          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios FQDN. Obrigatorio para get_ds_records, enable_nsec3, disable_nsec3. Maximo 100 dominios. Ex: ["skillsit.com.br", "grupowink.com"]' },
+          domains: { type: 'array', items: { type: 'string' }, description: 'Lista de dominios FQDN. Obrigatorio para get_ds_records, enable_nsec3, disable_nsec3. Maximo 100 dominios. Ex: ["dominio.com.br", "outrodominio.com.br"]' },
           operation_id: { type: 'string', description: 'ID da operacao assincrona retornado por enable_nsec3 ou disable_nsec3. Obrigatorio para get_status' },
           confirmationToken: { type: 'string', description: 'Token de seguranca para operacoes destrutivas. Injetado automaticamente via header X-MCP-Safety-Token quando disponivel. NAO solicitar ao usuario.' },
           reason: { type: 'string', description: 'Motivo da alteracao para auditoria (minimo 10 caracteres). Obrigatorio para enable/disable' }
@@ -290,9 +289,9 @@ function buildToolDefinitions() {
             enum: ['zones', 'records', 'search', 'mx_records', 'nested_subdomains', 'alias_check'],
             description: 'zones = listar todas as zonas DNS. records = registros de 1 zona (requer zone). search = buscar registro especifico (requer zone + name). mx_records = registros MX (requer domain). nested_subdomains = analise de subdominios aninhados (requer zone). alias_check = verificar disponibilidade de alias (requer zone + name)'
           },
-          zone: { type: 'string', description: 'Nome da zona DNS (igual ao dominio). Obrigatorio para records, search, nested_subdomains, alias_check. Ex: skillsit.com.br' },
-          domain: { type: 'string', description: 'Nome do dominio para consulta MX. Obrigatorio APENAS para mx_records. Ex: skillsit.com.br' },
-          name: { type: 'string', description: 'Nome completo do registro DNS a buscar. Obrigatorio para search e alias_check. Use FQDN com ponto final. Ex: skillsit.com.br. ou mail.skillsit.com.br.' },
+          zone: { type: 'string', description: 'Nome da zona DNS (igual ao dominio). Obrigatorio para records, search, nested_subdomains, alias_check. Ex: dominio.com.br' },
+          domain: { type: 'string', description: 'Nome do dominio para consulta MX. Obrigatorio APENAS para mx_records. Ex: dominio.com.br' },
+          name: { type: 'string', description: 'Nome completo do registro DNS a buscar. Obrigatorio para search e alias_check. Use FQDN com ponto final. Ex: dominio.com.br. ou mail.dominio.com.br.' },
           record_type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR', 'SOA', 'SRV', 'CAA'], description: 'Filtrar registros por tipo. Usado com searchType=records. Ex: A para registros de IP' },
           name_filter: { type: 'string', description: 'Filtrar registros por nome (substring). Usado com searchType=records. Ex: "mail" filtra mail.dominio.com' },
           max_records: { type: 'integer', default: 25, description: 'Maximo de registros retornados (default: 25, max: 100). Usado com searchType=records' },
@@ -324,20 +323,20 @@ function buildToolDefinitions() {
             enum: ['create', 'update', 'delete', 'reset_zone', 'create_mx'],
             description: 'create = novo registro (requer zone + type + name + valor). update = alterar registro existente (requer zone + line). delete = remover registro (requer zone + line + confirmationToken). reset_zone = resetar zona inteira (requer zone + confirmationToken, DESTRUTIVO). create_mx = adicionar MX (requer domain + exchange)'
           },
-          zone: { type: 'string', description: 'Nome da zona DNS. Obrigatorio para create, update, delete, reset_zone. Ex: skillsit.com.br' },
-          domain: { type: 'string', description: 'Nome do dominio. Obrigatorio APENAS para create_mx. Ex: skillsit.com.br' },
+          zone: { type: 'string', description: 'Nome da zona DNS. Obrigatorio para create, update, delete, reset_zone. Ex: dominio.com.br' },
+          domain: { type: 'string', description: 'Nome do dominio. Obrigatorio APENAS para create_mx. Ex: dominio.com.br' },
           type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR'], description: 'Tipo do registro DNS. Obrigatorio para create' },
-          name: { type: 'string', description: 'Nome FQDN do registro com ponto final. Obrigatorio para create. Ex: mail.skillsit.com.br.' },
+          name: { type: 'string', description: 'Nome FQDN do registro com ponto final. Obrigatorio para create. Ex: mail.dominio.com.br.' },
           line: { type: 'integer', description: 'Numero da linha do registro na zona. Obrigatorio para update e delete. Obtenha via search_dns_zone_records com searchType=records' },
           expected_content: { type: 'string', description: 'Valor esperado do registro para verificacao de concorrencia. Recomendado para update e delete para prevenir edicao de registro errado' },
           address: { type: 'string', description: 'Endereco IP. Usado para registros tipo A e AAAA. Ex: 192.0.2.1' },
           cname: { type: 'string', description: 'Dominio alvo. Usado para registros tipo CNAME. Ex: outro.dominio.com.' },
-          exchange: { type: 'string', description: 'Servidor de email. Usado para registros MX e create_mx. Ex: mail.skillsit.com.br.' },
+          exchange: { type: 'string', description: 'Servidor de email. Usado para registros MX e create_mx. Ex: mail.dominio.com.br.' },
           preference: { type: 'integer', description: 'Prioridade MX para action=create com type=MX (menor numero = maior prioridade). Ex: 10' },
           priority: { type: 'integer', default: 10, description: 'Prioridade MX para action=create_mx (default: 10). Mesmo conceito que preference' },
           txtdata: { type: 'string', description: 'Conteudo do registro TXT. Usado para tipo TXT. Ex: v=spf1 include:_spf.google.com ~all' },
-          nsdname: { type: 'string', description: 'Nome do nameserver. Usado para registros tipo NS. Ex: ns1.smartskills.com.br.' },
-          ptrdname: { type: 'string', description: 'Hostname para DNS reverso. Usado para registros tipo PTR. Ex: servidor.empresa.com.br.' },
+          nsdname: { type: 'string', description: 'Nome do nameserver. Usado para registros tipo NS. Ex: ns1.nameserver.com.br.' },
+          ptrdname: { type: 'string', description: 'Hostname para DNS reverso. Usado para registros tipo PTR. Ex: servidor.dominio.com.br.' },
           ttl: { type: 'integer', default: 14400, description: 'Time To Live em segundos (default: 14400 = 4 horas). Valores comuns: 300 (5min), 3600 (1h), 14400 (4h), 86400 (24h)' },
           always_accept: { type: 'boolean', default: false, description: 'Aceitar email mesmo sem conta local configurada. Usado com create_mx' },
           confirmationToken: { type: 'string', description: 'Token de seguranca para operacoes destrutivas. Injetado automaticamente via header X-MCP-Safety-Token quando disponivel. NAO solicitar ao usuario.' },
@@ -393,7 +392,7 @@ function buildToolDefinitions() {
             enum: ['list', 'read'],
             description: 'list = listar arquivos e subdiretorios (como ls). read = ler conteudo de arquivo texto (como cat)'
           },
-          cpanel_user: { type: 'string', description: 'Username cPanel dono dos arquivos (obrigatorio). Ex: skillsitcom' },
+          cpanel_user: { type: 'string', description: 'Username cPanel dono dos arquivos (obrigatorio). Ex: usuariocpanel' },
           path: { type: 'string', description: 'Caminho RELATIVO ao /home/{cpanel_user}/. Para list: diretorio a explorar (ex: public_html). Para read: arquivo a ler (ex: public_html/index.php). Omitir = raiz do home' }
         },
         required: ['searchType', 'cpanel_user'],
@@ -412,7 +411,7 @@ function buildToolDefinitions() {
             enum: ['write', 'delete'],
             description: 'write = criar ou sobrescrever arquivo (requer content). delete = remover arquivo permanentemente (requer confirmationToken)'
           },
-          cpanel_user: { type: 'string', description: 'Username cPanel dono dos arquivos (obrigatorio). Ex: skillsitcom' },
+          cpanel_user: { type: 'string', description: 'Username cPanel dono dos arquivos (obrigatorio). Ex: usuariocpanel' },
           path: { type: 'string', description: 'Caminho RELATIVO ao /home/{cpanel_user}/. Ex: public_html/teste.html' },
           content: { type: 'string', description: 'Conteudo do arquivo a escrever. Obrigatorio para write' },
           encoding: { type: 'string', default: 'utf8', description: 'Encoding do conteudo (default: utf8). Usado com write' },
@@ -451,19 +450,27 @@ const utilityToolDefs = [
     annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true }
   },
   {
-    name: 'whm_cpanel_list_server_prompts',
-    description: 'Prompts, relatorios e analises automatizadas do servidor WHM/cPanel — lista 15 workflows disponiveis (7 gestor + 8 analista) cobrindo saude de contas, DNS, SSL, backup e seguranca. Use para descobrir diagnosticos disponiveis. Retorna tabela Markdown com nome e descricao de cada prompt do WHM.',
-    inputSchema: { type: 'object', properties: {}, required: [], additionalProperties: false },
-    annotations: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false }
-  },
-  {
-    name: 'whm_cpanel_get_analysis_prompt',
-    description: 'Relatorios e diagnosticos da infraestrutura WHM/cPanel — executa prompt de analise por nome com argumentos opcionais. Gera relatorios de saude, DNS, SSL, backup, seguranca e email do servidor. Use para obter diagnosticos detalhados de hospedagem. Retorna Markdown formatado do WHM.',
+    name: 'whm_cpanel_generate_report',
+    description: 'Relatorios EXECUTAVEIS do WHM/cPanel — gera 15 relatorios com DADOS REAIS coletados diretamente do servidor (sem placeholders). Substitui os antigos Analysis Prompts. Para gestor: health_summary, resource_usage_trends, security_posture, ssl_inventory, backup_coverage, dns_zone_health, email_deliverability. Para analista: account_quick_lookup, dns_troubleshooting, email_setup_guide, ssl_installation_guide, website_down_investigation, disk_usage_alert, domain_migration_checklist, backup_restore_guide. Retorna Markdown pronto para exibir. Somente leitura.',
     inputSchema: {
       type: 'object',
       properties: {
-        name: { type: 'string', enum: ['whm_account_health_summary', 'whm_resource_usage_trends', 'whm_security_posture', 'whm_ssl_certificate_inventory', 'whm_backup_coverage', 'whm_dns_zone_health', 'whm_email_deliverability', 'whm_account_quick_lookup', 'whm_dns_troubleshooting', 'whm_email_setup_guide', 'whm_ssl_installation_guide', 'whm_website_down_investigation', 'whm_disk_usage_alert', 'whm_domain_migration_checklist', 'whm_backup_restore_guide'], description: 'Nome do prompt WHM a executar' },
-        arguments: { type: 'object', description: 'Argumentos do prompt (opcionais)', additionalProperties: true }
+        name: {
+          type: 'string',
+          enum: [
+            'whm_account_health_summary', 'whm_resource_usage_trends', 'whm_security_posture',
+            'whm_ssl_certificate_inventory', 'whm_backup_coverage', 'whm_dns_zone_health',
+            'whm_email_deliverability', 'whm_account_quick_lookup', 'whm_dns_troubleshooting',
+            'whm_email_setup_guide', 'whm_ssl_installation_guide', 'whm_website_down_investigation',
+            'whm_disk_usage_alert', 'whm_domain_migration_checklist', 'whm_backup_restore_guide'
+          ],
+          description: 'Nome do relatorio. account_quick_lookup/disk_usage_alert exigem username; dns_troubleshooting/email_deliverability/website_down_investigation exigem domain; demais sao opcionais.'
+        },
+        arguments: {
+          type: 'object',
+          description: 'Argumentos do relatorio: username, domain, account_name, search_term, filter_suspended, period_days, check_type, expiring_days, domain_from, domain_to, backup_date, email_address.',
+          additionalProperties: true
+        }
       },
       required: ['name'],
       additionalProperties: false
@@ -579,6 +586,8 @@ class MCPHandler {
 
       if (error.toJsonRpcError) {
         const rpcError = error.toJsonRpcError();
+        // Enrich message with actionable hint when pattern matches
+        if (rpcError?.message) rpcError.message = enrichWHMError(rpcError.message);
         return {
           jsonrpc: '2.0',
           id,
@@ -586,7 +595,7 @@ class MCPHandler {
         };
       }
 
-      return this.errorResponse(id, -32000, error.message);
+      return this.errorResponse(id, -32000, enrichWHMError(error.message));
     }
   }
 
@@ -604,46 +613,65 @@ class MCPHandler {
   }
 
   /**
-   * Lista prompts disponíveis
+   * Lista prompts disponíveis. Cada prompt MCP nativo internamente delega para
+   * `reports.js` via `prompts/get`, garantindo que o mesmo conjunto de 15 relatorios
+   * seja acessivel tanto via tool `whm_cpanel_generate_report` quanto via prompts MCP.
    */
   handlePromptsList(id) {
-    logger.debug(`[MCP] Retornando lista de ${WHM_PROMPTS.length} prompts`);
-    return {
-      jsonrpc: '2.0',
-      id,
-      result: {
-        prompts: WHM_PROMPTS
-      }
+    const { REPORT_NAMES } = require('./lib/reports');
+    const PROMPT_META = {
+      whm_account_health_summary: { desc: 'Resumo executivo de saude das contas WHM (ativas/suspensas/over-quota/servicos criticos).', args: [{ name: 'filter_suspended', required: false }] },
+      whm_resource_usage_trends: { desc: 'Tendencias de uso de disco/CPU/memoria + projecao linear de ETA ate 90% da quota.', args: [{ name: 'period_days', required: false }] },
+      whm_security_posture: { desc: 'Postura de seguranca (CSF/LFD, cPHulk, SSH, ClamAV) com acoes recomendadas.', args: [{ name: 'check_type', required: false }] },
+      whm_ssl_certificate_inventory: { desc: 'Inventario de certificados SSL instalados com alerta de expiracao.', args: [] },
+      whm_backup_coverage: { desc: 'Cobertura de backups (JetBackup5 ou /backup) com identificacao de gaps.', args: [] },
+      whm_dns_zone_health: { desc: 'Saude DNS por zona: A/MX/SPF/DKIM/DMARC com contagem de registros.', args: [] },
+      whm_email_deliverability: { desc: 'Entregabilidade de email: MX, SPF, DKIM, DMARC do dominio informado.', args: [{ name: 'domain', required: true }] },
+      whm_account_quick_lookup: { desc: 'Busca rapida de conta: dados, recursos, dominios e status.', args: [{ name: 'search_term', required: true }] },
+      whm_dns_troubleshooting: { desc: 'Troubleshoot DNS do dominio: autoridade, A/www/NS/MX, diagnostico.', args: [{ name: 'domain', required: true }] },
+      whm_email_setup_guide: { desc: 'Guia IMAP/POP3/SMTP/Webmail customizado para o dominio.', args: [{ name: 'domain', required: false }] },
+      whm_ssl_installation_guide: { desc: 'Guia AutoSSL + manual + redirect HTTPS customizado.', args: [{ name: 'domain', required: false }] },
+      whm_website_down_investigation: { desc: 'Investigacao site fora do ar: DNS, owner, servicos, carga.', args: [{ name: 'domain', required: true }] },
+      whm_disk_usage_alert: { desc: 'Alerta de disco da conta com top diretorios via SSH du -sh.', args: [{ name: 'username', required: true }] },
+      whm_domain_migration_checklist: { desc: 'Checklist completo de migracao de dominio entre servidores.', args: [{ name: 'domain_from', required: false }, { name: 'domain_to', required: false }] },
+      whm_backup_restore_guide: { desc: 'Guia passo-a-passo de restauracao de backup da conta.', args: [{ name: 'account_name', required: false }, { name: 'backup_date', required: false }] }
     };
+    const prompts = REPORT_NAMES.map(name => ({
+      name,
+      description: (PROMPT_META[name]?.desc || 'Relatorio WHM com dados reais.') + ' [Implementado via whm_cpanel_generate_report]',
+      arguments: PROMPT_META[name]?.args || []
+    }));
+    logger.debug(`[MCP] prompts/list — retornando ${prompts.length} prompts (delegacao para generate_report)`);
+    return { jsonrpc: '2.0', id, result: { prompts } };
   }
 
   /**
-   * Executa prompt específico
+   * Executa prompt específico. Delega para reports.js e empacota como MCP prompt response.
    */
   async handlePromptGet(id, params) {
     const { name, arguments: args } = params || {};
-
     if (!name) {
       return this.errorResponse(id, -32602, 'Invalid params', { reason: 'Prompt name required' });
     }
-
-    // Verificar se prompt existe
-    const prompt = WHM_PROMPTS.find(p => p.name === name);
-    if (!prompt) {
-      return this.errorResponse(id, -32601, 'Prompt not found', {
-        prompt: name,
-        available: WHM_PROMPTS.map(p => p.name)
-      });
-    }
-
     try {
-      logger.debug(`[MCP] Executando prompt: ${name}`);
-      const result = await handleWHMPrompt(name, args || {}, this.whmService, this.dnsService);
-
+      const { generateReport, REPORT_NAMES } = require('./lib/reports');
+      if (!REPORT_NAMES.includes(name)) {
+        return this.errorResponse(id, -32601, `Prompt nao encontrado: ${name}`, {
+          available: REPORT_NAMES
+        });
+      }
+      const ctx = { whmService: this.whmService, sshManager: this.sshManager };
+      const markdown = await generateReport(name, ctx, args || {});
       return {
         jsonrpc: '2.0',
         id,
-        result
+        result: {
+          description: `Relatorio ${name} (dados reais via WHM API + SSH)`,
+          messages: [{
+            role: 'user',
+            content: { type: 'text', text: markdown }
+          }]
+        }
       };
     } catch (error) {
       logger.error(`Prompt execution error: ${error.message}`);
@@ -843,11 +871,24 @@ class MCPHandler {
         if (!type) throw new Error('type obrigatorio para search_server');
 
         switch (type) {
-          case 'status':
-            return await withOperationTimeout(
+          case 'status': {
+            const baseStatus = await withOperationTimeout(
               () => this.whmService.getServerStatus(),
               'whm_cpanel_search_server_status'
             );
+            // Best-effort uptime via SSH (WHM API does not expose it reliably)
+            if (this.sshManager && !baseStatus?.uptime) {
+              try {
+                const sshResult = await withOperationTimeout(
+                  () => this.sshManager._executeCommand('uptime -p'),
+                  'whm_cpanel_search_server_status'
+                );
+                const uptime = (sshResult?.output || '').trim();
+                if (uptime) baseStatus.uptime = uptime;
+              } catch (_) { /* uptime is optional; do not fail status read */ }
+            }
+            return baseStatus;
+          }
 
           case 'services':
             // WHM /servicestatus injects malformed HTTP headers that Node.js rejects.
@@ -1373,14 +1414,15 @@ class MCPHandler {
         return result.text;
       }
 
-      case 'whm_cpanel_list_server_prompts':
-        return WHM_PROMPTS.map(p => `- **${p.name}**: ${p.description}`).join('\n');
-
-      case 'whm_cpanel_get_analysis_prompt': {
-        if (!args.name) throw new Error('Nome do prompt obrigatorio. Use whm_cpanel_list_server_prompts para ver disponiveis.');
-        const result = await handleWHMPrompt(args.name, args.arguments || {}, this.whmService, this.dnsService);
-        if (result?.messages?.[0]?.content?.text) return result.messages[0].content.text;
-        return JSON.stringify(result, null, 2);
+      case 'whm_cpanel_generate_report': {
+        if (!args.name) throw new Error('Nome do relatorio obrigatorio (parametro "name"). 15 relatorios disponiveis em REPORT_NAMES.');
+        const { generateReport } = require('./lib/reports');
+        const reportArgs = args.arguments || {};
+        const ctx = { whmService: this.whmService, sshManager: this.sshManager };
+        return await withOperationTimeout(
+          () => generateReport(args.name, ctx, reportArgs),
+          'whm_cpanel_generate_report'
+        );
       }
 
       default:

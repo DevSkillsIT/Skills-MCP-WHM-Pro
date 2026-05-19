@@ -1,12 +1,12 @@
 /**
- * Tests for response-formatter.js (16 tools consolidadas + 4 utility)
+ * Tests for response-formatter.js (12 core + 3 utility = 15 tools)
  * SPEC-WHM-ENHANCE-001 / F01, F06
  */
 const { formatToolResponse, TOOL_FORMATTERS } = require('../../../src/lib/formatters/response-formatter');
 
 describe('TOOL_FORMATTERS map', () => {
-  test('REQ-F01-010: contem exatamente 16 entries (12 core + 4 utility)', () => {
-    expect(Object.keys(TOOL_FORMATTERS).length).toBe(16);
+  test('REQ-F01-010: contem exatamente 15 entries (12 core + 3 utility)', () => {
+    expect(Object.keys(TOOL_FORMATTERS).length).toBe(15);
   });
 
   test('contem todas as 12 tools core', () => {
@@ -21,8 +21,8 @@ describe('TOOL_FORMATTERS map', () => {
     core.forEach(name => expect(TOOL_FORMATTERS[name]).toBeDefined());
   });
 
-  test('contem 4 tools utilitarias', () => {
-    ['whm_cpanel_list_server_resources', 'whm_cpanel_read_server_resource', 'whm_cpanel_list_server_prompts', 'whm_cpanel_get_analysis_prompt'].forEach(name => {
+  test('contem 3 tools utilitarias (generate_report substitui list_server_prompts/get_analysis_prompt)', () => {
+    ['whm_cpanel_list_server_resources', 'whm_cpanel_read_server_resource', 'whm_cpanel_generate_report'].forEach(name => {
       expect(TOOL_FORMATTERS[name]).toBeDefined();
     });
   });

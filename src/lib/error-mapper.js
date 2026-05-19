@@ -319,6 +319,70 @@ function getRetryConfig(errorType) {
   return RETRY_CONFIG[errorType] || null;
 }
 
+/**
+ * Mapa de padroes de mensagens crus do WHM para mensagens orientativas ao LLM.
+ * Cada entry tem: regex de detec, mensagem com causa provavel + acao alternativa.
+ */
+const WHM_HINTS = [
+  {
+    re: /Account does not exist/i,
+    hint: 'Causa provavel: username invalido ou conta nao existe neste servidor WHM. ' +
+          'Acao sugerida: use search_hosting_accounts com searchType=list para listar contas validas.'
+  },
+  {
+    re: /Zone does not exist/i,
+    hint: 'Causa provavel: zona DNS nao existe ou nome esta incorreto. ' +
+          'Acao sugerida: use search_dns_zone_records com searchType=zones para listar zonas disponiveis.'
+  },
+  {
+    re: /User .* does not exist/i,
+    hint: 'Causa provavel: usuario cPanel inexistente. ' +
+          'Acao sugerida: use search_hosting_accounts (searchType=list) para confirmar o username correto.'
+  },
+  {
+    re: /Domain .* does not exist/i,
+    hint: 'Causa provavel: dominio nao hospedado neste servidor. ' +
+          'Acao sugerida: use search_hosted_domains (searchType=all) para listar dominios hospedados.'
+  },
+  {
+    re: /Package .* does not exist/i,
+    hint: 'Causa provavel: plano (package) invalido. ' +
+          'Acao sugerida: o servidor WHM expoe pacotes em "Account Functions > Manage Account/Package".'
+  },
+  {
+    re: /Directory traversal not allowed/i,
+    hint: 'Causa provavel: caminho tentou escapar de /home/{user}/. ' +
+          'Acao sugerida: forneca caminho RELATIVO ao home (ex: "public_html/index.php"), sem ".." ou paths absolutos.'
+  },
+  {
+    re: /Resource busy: another (\w+) in progress/i,
+    hint: 'Causa provavel: outra operacao concorrente segura este recurso. ' +
+          'Acao sugerida: aguarde alguns segundos e repita a chamada.'
+  },
+  {
+    re: /Parse Error: Invalid header token/i,
+    hint: 'Causa provavel: endpoint WHM /servicestatus tem header malformado conhecido. ' +
+          'Acao sugerida: este caso ja tem fallback SSH automatico; tente search_server_status (type=services) novamente.'
+  }
+];
+
+/**
+ * Envolve mensagem de erro crua do WHM com causa provavel e acao alternativa.
+ * Se nenhum padrao corresponder, retorna a mensagem original.
+ *
+ * @param {string|Error} input - Erro ou mensagem
+ * @returns {string} Mensagem enriquecida
+ */
+function enrichWHMError(input) {
+  const msg = typeof input === 'string' ? input : (input?.message || String(input));
+  for (const { re, hint } of WHM_HINTS) {
+    if (re.test(msg)) {
+      return `${msg}\n\n${hint}`;
+    }
+  }
+  return msg;
+}
+
 module.exports = {
   mapWhmError,
   createMappedError,
@@ -327,6 +391,8 @@ module.exports = {
   calculateSeverity,
   getErrorTypes,
   getRetryConfig,
+  enrichWHMError,
   ERROR_TYPES,
-  RETRY_CONFIG
+  RETRY_CONFIG,
+  WHM_HINTS
 };

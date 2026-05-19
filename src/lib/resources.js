@@ -28,12 +28,12 @@ function listResources() {
 }
 
 async function readResource(uri, whmService, sshManager) {
-  const { formatServerStatus, formatServicesStatus } = require('./formatters/whm-formatters');
+  const { formatServerStatus, formatServerConfig, formatServicesStatus } = require('./formatters/whm-formatters');
 
   switch (uri) {
     case 'whm://server/config': {
       const data = await whmService.getServerStatus();
-      return { uri, mimeType: 'text/markdown', text: formatServerStatus(data) };
+      return { uri, mimeType: 'text/markdown', text: formatServerConfig(data) };
     }
     case 'whm://server/status': {
       const status = await whmService.getServerStatus();

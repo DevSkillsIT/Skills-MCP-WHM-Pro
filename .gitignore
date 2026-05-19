@@ -3,6 +3,11 @@
 .env.local
 .env.*.local
 
+# Local-only operational docs (audit reports, post-mortems with real infra data)
+.local-docs/
+AUDIT-*.md
+POSTMORTEM-*.md
+
 # Private keys and certificates (NEVER commit)
 *.pem
 *.ppk

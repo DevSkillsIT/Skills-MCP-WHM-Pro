@@ -15,7 +15,9 @@ const {
   formatAccountsList, formatAccountDetail, formatAccountDomains,
   formatServerStatus, formatServicesStatus,
   formatDomainsList, formatDomainDetail,
+  formatDomainOwner, formatDomainAuthority, formatResolveIp,
   formatDnsZonesList, formatDnsRecordsList, formatDnsRecordDetail, formatMxRecordsList,
+  formatNestedSubdomains, formatConversionsList,
   formatDnssecInfo,
   formatSystemLoad, formatLogLines,
   formatFilesList, formatFileContent,
@@ -61,15 +63,21 @@ const TOOL_FORMATTERS = {
   // === DOMINIOS (3) ===
   'whm_cpanel_search_hosted_domains': (data, args) => {
     const st = args?.searchType || 'all';
-    if (st === 'data' || st === 'owner' || st === 'addon_details' || st === 'authority') return formatDomainDetail(data);
-    const items = Array.isArray(data) ? data : (data?.domains || data?.data || []);
+    if (st === 'data' || st === 'addon_details') return formatDomainDetail(data);
+    if (st === 'owner') return formatDomainOwner(data, args?.domain);
+    if (st === 'authority') return formatDomainAuthority(data, args?.domain);
+    let items = Array.isArray(data) ? data : (data?.domains || data?.data || []);
+    // Apply filter by domain type if requested and items expose a type field
+    if (args?.filter && Array.isArray(items) && items.length && items.some(i => i?.type)) {
+      items = items.filter(i => i?.type === args.filter);
+    }
     const paged = paginate(items, args?.limit, args?.offset);
     return formatDomainsList(paged);
   },
   'whm_cpanel_manage_hosted_domains': (data, args) => {
     const action = args?.action;
-    if (action === 'resolve_ip') return formatDomainDetail(data);
-    if (action === 'get_conversion_details') return formatOperationResult(data, action);
+    if (action === 'resolve_ip') return formatResolveIp(data, args?.domain);
+    if (action === 'list_conversions') return formatConversionsList(data);
     return formatOperationResult(data, action);
   },
   'whm_cpanel_manage_dnssec_settings': (data, args) => {
@@ -91,14 +99,17 @@ const TOOL_FORMATTERS = {
       return formatMxRecordsList(records);
     }
     if (st === 'nested_subdomains') {
-      if (!data) return 'Sem subdominios aninhados.';
-      if (typeof data === 'string') return data;
-      return formatOperationResult(data, 'nested_subdomains');
+      return formatNestedSubdomains(data, args?.zone);
     }
     if (st === 'alias_check') {
-      if (!data) return 'Verificacao de alias nao disponivel.';
+      if (!data) return 'Verificacao de alias nao disponivel neste servidor WHM.';
       if (typeof data === 'string') return data;
-      if (data.available !== undefined) return data.available ? 'Alias disponivel para uso.' : 'Alias ja esta em uso.';
+      const d = data?.data || data;
+      if (d.available !== undefined) {
+        return d.available
+          ? `Alias \`${args?.name || ''}\` disponivel em ${args?.zone || 'zona'}.`
+          : `Alias \`${args?.name || ''}\` ja esta em uso em ${args?.zone || 'zona'}.`;
+      }
       return formatOperationResult(data, 'alias_check');
     }
     // zones (default)
@@ -138,11 +149,10 @@ const TOOL_FORMATTERS = {
     return formatOperationResult(data, args?.action);
   },
 
-  // === UTILITARIOS (4) ===
+  // === UTILITARIOS (3) ===
   'whm_cpanel_list_server_resources': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
   'whm_cpanel_read_server_resource': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-  'whm_cpanel_list_server_prompts': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
-  'whm_cpanel_get_analysis_prompt': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
+  'whm_cpanel_generate_report': (data) => typeof data === 'string' ? data : JSON.stringify(data, null, 2),
 };
 
 /**

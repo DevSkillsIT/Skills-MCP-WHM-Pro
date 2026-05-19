@@ -39,7 +39,7 @@ function truncate(text, maxLen = 300) {
  * @param {number} total - Total de items
  * @returns {string} Linha de paginacao formatada
  */
-function pageInfo(count, limit, offset, total) {
+function pageInfo(count, limit, offset, total, opts = {}) {
   const parts = [`**${count} resultados**`];
   if (total && total > count) {
     const page = Math.floor(offset / limit) + 1;
@@ -47,6 +47,9 @@ function pageInfo(count, limit, offset, total) {
     parts.push(`Pagina ${page}/${totalPages} (total: ${total}, limit: ${limit})`);
   } else {
     parts.push('Mostrando todos');
+  }
+  if (opts.clamped && opts.requestedLimit && opts.requestedLimit !== limit) {
+    parts.push(`limit reduzido de ${opts.requestedLimit} para ${limit} (max permitido)`);
   }
   return parts.join(' | ');
 }
@@ -94,13 +97,22 @@ function maskPassword(value) {
  */
 function paginate(items, limit = 25, offset = 0) {
   if (!items || !Array.isArray(items)) {
-    return { items: [], count: 0, total: 0, limit: 25, offset: 0 };
+    return { items: [], count: 0, total: 0, limit: 25, offset: 0, requestedLimit: limit };
   }
+  const requestedLimit = limit;
   const safeLimit = Math.min(Math.max(1, limit || 25), 50);
   const safeOffset = Math.max(0, offset || 0);
   const total = items.length;
   const paged = items.slice(safeOffset, safeOffset + safeLimit);
-  return { items: paged, count: paged.length, total, limit: safeLimit, offset: safeOffset };
+  return {
+    items: paged,
+    count: paged.length,
+    total,
+    limit: safeLimit,
+    offset: safeOffset,
+    requestedLimit,
+    clamped: requestedLimit && requestedLimit !== safeLimit
+  };
 }
 
 /**

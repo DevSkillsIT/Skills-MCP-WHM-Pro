@@ -5,28 +5,28 @@
 const MCPHandler = require('../../src/mcp-handler');
 const { toolDefinitions } = MCPHandler;
 
-describe('AC-03: Tool count = 16', () => {
-  test('total de 16 tools (12 core + 4 utility)', () => {
-    expect(toolDefinitions.length).toBe(16);
+describe('AC-03: Tool count = 15', () => {
+  test('total de 15 tools (12 core + 3 utility)', () => {
+    expect(toolDefinitions.length).toBe(15);
   });
 
   test('12 tools core com prefixo search_/manage_', () => {
     const core = toolDefinitions.filter(t =>
-      (t.name.includes('search_') || t.name.includes('manage_')) && !t.name.includes('list_resources') && !t.name.includes('read_resource') && !t.name.includes('list_prompts') && !t.name.includes('get_prompt')
+      (t.name.includes('search_') || t.name.includes('manage_')) && !t.name.includes('list_resources') && !t.name.includes('read_resource') && !t.name.includes('generate_report')
     );
     expect(core.length).toBe(12);
   });
 
-  test('4 tools utilitarias', () => {
+  test('3 tools utilitarias (generate_report substitui list_prompts/get_analysis_prompt)', () => {
     const utility = toolDefinitions.filter(t =>
-      ['whm_cpanel_list_server_resources', 'whm_cpanel_read_server_resource', 'whm_cpanel_list_server_prompts', 'whm_cpanel_get_analysis_prompt'].includes(t.name)
+      ['whm_cpanel_list_server_resources', 'whm_cpanel_read_server_resource', 'whm_cpanel_generate_report'].includes(t.name)
     );
-    expect(utility.length).toBe(4);
+    expect(utility.length).toBe(3);
   });
 });
 
 describe('AC-05: Annotations completas', () => {
-  test('TODAS as 16 tools possuem annotations com 4 propriedades', () => {
+  test('TODAS as 15 tools possuem annotations com 4 propriedades', () => {
     toolDefinitions.forEach(tool => {
       expect(tool.annotations).toBeDefined();
       expect(typeof tool.annotations.readOnlyHint).toBe('boolean');
@@ -60,8 +60,8 @@ describe('AC-05: Annotations completas', () => {
     });
   });
 
-  test('tools utilitarias list_resources e list_prompts sao locais (openWorldHint=false)', () => {
-    ['whm_cpanel_list_server_resources', 'whm_cpanel_list_server_prompts'].forEach(name => {
+  test('tools utilitarias list_resources sao locais (openWorldHint=false)', () => {
+    ['whm_cpanel_list_server_resources'].forEach(name => {
       const tool = toolDefinitions.find(t => t.name === name);
       expect(tool.annotations.openWorldHint).toBe(false);
     });
@@ -108,7 +108,7 @@ describe('F06: additionalProperties e enums', () => {
 });
 
 describe('F10: Descricoes mencionam Retorna Markdown', () => {
-  test('TODAS as 16 tools mencionam Markdown na descricao', () => {
+  test('TODAS as 15 tools mencionam Markdown na descricao', () => {
     toolDefinitions.forEach(tool => {
       expect(tool.description.toLowerCase()).toContain('markdown');
     });

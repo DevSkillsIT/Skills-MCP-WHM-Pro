@@ -139,15 +139,15 @@ function extractRecordsByName(records, name, matchMode = 'exact') {
 /**
  * Agrupa registros por nível de subdomínio
  * @param {Array} records - Array de registros
- * @param {string} baseDomain - Domínio base (ex: skillsit.com.br)
+ * @param {string} baseDomain - Domínio base (ex: dominio.com.br)
  * @returns {object} Registros agrupados por nível
  */
 function groupRecordsByLevel(records, baseDomain) {
   const levels = {
-    base: [],      // skillsit.com.br ou @
-    level1: [],    // www.skillsit.com.br (1 ponto no subdomínio)
-    level2: [],    // app.tools.skillsit.com.br (2 pontos)
-    level3plus: [] // deep.nested.app.tools.skillsit.com.br (3+ pontos)
+    base: [],      // dominio.com.br ou @
+    level1: [],    // www.dominio.com.br (1 ponto no subdomínio)
+    level2: [],    // app.tools.dominio.com.br (2 pontos)
+    level3plus: [] // deep.nested.app.tools.dominio.com.br (3+ pontos)
   };
 
   if (!records || !Array.isArray(records)) {

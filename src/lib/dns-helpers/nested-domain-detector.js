@@ -8,7 +8,7 @@
  *
  * CONTEXTO:
  * No WHM/cPanel, cada domínio registrado em uma conta cria automaticamente um subdomínio.
- * Exemplo: Conta skillsit.com.br + registra cliente.com.br = cria cliente.skillsit.com.br
+ * Exemplo: Conta dominio.com.br + registra cliente.com.br = cria cliente.dominio.com.br
  * Isso é COMUM e precisa ser detectado e tratado preventivamente.
  */
 

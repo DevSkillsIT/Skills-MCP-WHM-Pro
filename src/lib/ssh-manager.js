@@ -325,11 +325,12 @@ class SSHManager {
 
     try {
       // Coletar informacoes do sistema
-      const [loadResult, uptimeResult, memResult, diskResult] = await Promise.all([
+      const [loadResult, uptimeResult, memResult, diskResult, coresResult] = await Promise.all([
         this._executeCommand('cat /proc/loadavg'),
         this._executeCommand('uptime -p'),
         this._executeCommand("free -m | grep '^Mem:'"),
-        this._executeCommand("df -h / | tail -1")
+        this._executeCommand("df -h / | tail -1"),
+        this._executeCommand('nproc')
       ]);
 
       // Parsear load average
@@ -358,6 +359,9 @@ class SSHManager {
         usage: diskParts[4] || 'Unknown'
       };
 
+      // Parsear CPU cores
+      const cpuCount = parseInt((coresResult.output || '').trim(), 10) || null;
+
       const [seconds, nanoseconds] = process.hrtime(startTime);
       sshOperationDuration.observe(
         { operation: 'get_load', status: 'success' },
@@ -371,6 +375,7 @@ class SSHManager {
           uptime: uptimeResult.output.trim(),
           memory: memory,
           disk: disk,
+          cpuCount: cpuCount,
           timestamp: new Date().toISOString()
         }
       };

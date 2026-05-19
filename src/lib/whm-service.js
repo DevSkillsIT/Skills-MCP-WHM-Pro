@@ -31,9 +31,13 @@ class WHMError extends Error {
   }
 
   toJsonRpcError() {
+    // Lazy-require to avoid circular dependency
+    let enrichWHMError;
+    try { ({ enrichWHMError } = require('./error-mapper')); } catch (_) { enrichWHMError = (m) => m; }
+    const baseMessage = `WHM API Error: ${this.message}`;
     return {
       code: this.code,
-      message: `WHM API Error: ${this.message}`,
+      message: enrichWHMError(baseMessage),
       data: {
         whm_reason: this.message,
         whm_metadata_result: this.metadata.result,
@@ -348,6 +352,9 @@ class WHMService {
       // Try to get version info from /version endpoint
       let version = 'N/A';
       let hostname = 'N/A';
+      let mainip = 'N/A';
+      let uptime = null;
+
       try {
         const versionResult = await this.get('version');
         version = versionResult?.data?.version || versionResult?.version || 'N/A';
@@ -358,10 +365,20 @@ class WHMService {
         hostname = hostnameResult?.data?.hostname || hostnameResult?.hostname || 'N/A';
       } catch (_) { /* hostname endpoint optional */ }
 
+      try {
+        const ipResult = await this.get('get_shared_ip');
+        mainip = ipResult?.data?.ip || ipResult?.ip || 'N/A';
+      } catch (_) { /* optional */ }
+
+      // Uptime is only reachable via SSH; we don't bring SSH into the service to avoid
+      // tight coupling. The resource/status path can compose SSH separately when needed.
+
       return {
         status: 'active',
         version,
         hostname,
+        mainip,
+        uptime,
         // Map WHM loadavg fields to what the formatter expects
         one: loadData.one || loadData.loadavg?.[0] || '0',
         five: loadData.five || loadData.loadavg?.[1] || '0',
@@ -378,6 +395,8 @@ class WHMService {
         status: 'active',
         version: 'N/A',
         hostname: 'N/A',
+        mainip: 'N/A',
+        uptime: null,
         one: '0', five: '0', fifteen: '0',
         loadavg: ['0', '0', '0'],
         timestamp: new Date().toISOString(),
@@ -432,6 +451,17 @@ class WHMService {
           (d.user || d.owner || '').toLowerCase() === username.toLowerCase()
         );
       }
+      // Normalize type: WHM returns 'domain_type' (main_domain, sub_domain, addon_domain, parked_domain)
+      const TYPE_MAP = {
+        main_domain: 'main',
+        sub_domain: 'subdomain',
+        addon_domain: 'addon',
+        parked_domain: 'parked'
+      };
+      domains = domains.map(d => ({
+        ...d,
+        type: d.type || TYPE_MAP[d.domain_type] || d.domain_type || 'unknown'
+      }));
       // Apply client-side pagination after filtering
       const total = domains.length;
       const safeLimit = Math.min(limit || 50, 50);
@@ -590,6 +620,18 @@ class WHMService {
     const result = await this.get('get_domain_info', params);
     let domains = result.data?.domains || result.data || [];
     let total = result.data?.total || result.total || domains.length;
+
+    // Normalize type: WHM returns 'domain_type' (main_domain, sub_domain, addon_domain, parked_domain)
+    const TYPE_MAP = {
+      main_domain: 'main',
+      sub_domain: 'subdomain',
+      addon_domain: 'addon',
+      parked_domain: 'parked'
+    };
+    domains = domains.map(d => ({
+      ...d,
+      type: d.type || TYPE_MAP[d.domain_type] || d.domain_type || 'unknown'
+    }));
 
     // FEATURE: Filtrar por nome de domínio (substring, case-insensitive)
     if (domainFilter && typeof domainFilter === 'string' && domainFilter.trim()) {
@@ -921,11 +963,34 @@ class WHMService {
       throw new WHMError('Username é obrigatório', { username });
     }
 
-    const result = await this.get('convert_addon_list_addon_domains', { username });
-    return {
-      success: true,
-      data: result.data || result
-    };
+    // Strategy 1: get_domain_info filtered to user + addon type (works on modern WHM)
+    try {
+      const result = await this.get('get_domain_info', { limit: 500, offset: 0 });
+      const all = result?.data?.domains || result?.data || [];
+      const addons = all.filter(d => {
+        const owner = (d.user || d.owner || '').toLowerCase();
+        const type = d.domain_type || d.type || '';
+        return owner === username.toLowerCase() && type.includes('addon');
+      }).map(d => ({
+        domain: d.domain,
+        user: d.user || d.owner,
+        document_root: d.documentroot || d.docroot,
+        type: 'addon'
+      }));
+      if (addons.length > 0) {
+        return { success: true, data: addons };
+      }
+    } catch (_) { /* fall through to legacy endpoint */ }
+
+    // Strategy 2: legacy convert_addon_list_addon_domains (addons eligible for conversion)
+    try {
+      const result = await this.get('convert_addon_list_addon_domains', { username });
+      const payload = result?.data || result;
+      const items = Array.isArray(payload) ? payload : (payload?.addon_domains || payload?.domains || []);
+      return { success: true, data: items };
+    } catch (error) {
+      return { success: true, data: [] };
+    }
   }
 
   /**
@@ -1188,7 +1253,9 @@ class WHMService {
       // Fallback claro quando o endpoint não responde ou DNSSEC não está habilitado
       const reason = error?.message || 'Endpoint indisponível';
       throw new WHMError(
-        'DNSSEC não configurado ou endpoint WHM indisponível para fetch_ds_records_for_domains',
+        'DNSSEC indisponivel: o servidor WHM nao expoe fetch_ds_records_for_domains. ' +
+        'Causa provavel: DNSSEC nao habilitado neste WHM, ou versao do cPanel sem o modulo NSEC3. ' +
+        'Acao sugerida: confirme no WHM em "DNSSEC" ou use manage_dns_zone_records para listar a zona manualmente.',
         {
           domains: sanitizedDomains,
           reason
@@ -1229,7 +1296,9 @@ class WHMService {
     } catch (error) {
       const reason = error?.message || 'Endpoint indisponível';
       throw new WHMError(
-        'Checagem de ALIAS não suportada ou indisponível neste WHM (DNS::is_alias_available)',
+        'Verificacao de alias indisponivel: o endpoint DNS::is_alias_available nao existe nesta versao do WHM. ' +
+        'Acao alternativa: use search_dns_zone_records (searchType=search, zone, name, match_mode=exact) ' +
+        'para verificar se o nome ja existe na zona — se nenhum registro for retornado, o alias esta livre.',
         {
           zone: zoneValidation.sanitized,
           name: name.trim(),

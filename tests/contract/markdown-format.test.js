@@ -49,7 +49,7 @@ describe('AC-04a: Cenario Gherkin — busca de contas', () => {
   test('search_accounts retorna tabela com headers corretos', () => {
     const { args, data } = MOCK_DATA['whm_cpanel_search_hosting_accounts'];
     const result = formatToolResponse('whm_cpanel_search_hosting_accounts', data, args);
-    expect(result).toContain('| Username | Dominio | Email | Plano | Disco | Status |');
+    expect(result).toContain('| Username | Dominio | Email | Plano | Disco Usado/Limite | Status |');
     expect(result).toContain('resultados');
     expect(result).not.toContain('"user":');
   });
@@ -62,8 +62,8 @@ describe('Bridge tools retornam strings', () => {
   });
 });
 
-describe('TOOL_FORMATTERS count = 16 (12 core + 4 utility)', () => {
-  test('exatamente 16 formatters registrados', () => {
-    expect(Object.keys(TOOL_FORMATTERS).length).toBe(16);
+describe('TOOL_FORMATTERS count = 15 (12 core + 3 utility)', () => {
+  test('exatamente 15 formatters registrados', () => {
+    expect(Object.keys(TOOL_FORMATTERS).length).toBe(15);
   });
 });
