@@ -7,6 +7,30 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.1.0] - 2026-05-21
+
+### Adicionado
+
+- 🆕 **Auto-resolucao de zona DNS** (`src/lib/dns-helpers/zone-resolver.js`): ao criar um registro, a zona correta e detectada automaticamente a partir do FQDN do `name`. Resolve a confusao comum entre tres conceitos distintos do WHM:
+  - **username da conta cPanel** (ex: a conta que hospeda varios dominios)
+  - **dominio principal da conta**
+  - **zona DNS do registro** (cada dominio hospedado tem zona propria e independente)
+- 🆕 **Validacao de coerencia zone↔name**: se a zona informada nao corresponde ao sufixo do registro, o MCP corrige para a zona correta e explica o motivo no retorno ("DNS opera por zona, nao por conta cPanel").
+- 🆕 **Normalizacao de name**: aceita FQDN (`teste.dominio.com`), FQDN com ponto final (`teste.dominio.com.`) ou nome relativo (`teste`) quando a zona e informada.
+- 🆕 15 testes unit para o zone-resolver (matching por sufixo mais longo, apex, relativo, incoerencia, zona inexistente).
+
+### Modificado
+
+- `whm_cpanel_manage_dns_zone_records` (action=create): parametro `zone` agora e **OPCIONAL** — inferido do `name`. Descricoes do schema reescritas para deixar explicito que DNS opera por zona, independente de conta/username.
+- Descricao de `expected_content` corrigida: exige a LINHA COMPLETA no formato BIND (`nome. TTL IN TIPO valor`), nao apenas o valor.
+
+### Testes
+
+- ✅ **752/752 testes** passando (15 novos do zone-resolver)
+- ✅ Validacao end-to-end ao vivo: criacao com auto-resolucao + confirmacao + remocao
+
+---
+
 ## [2.0.0] - 2026-05-19
 
 ### ⚠️ BREAKING CHANGES

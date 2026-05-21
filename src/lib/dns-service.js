@@ -483,18 +483,35 @@ class DNSService {
     const startTime = process.hrtime();
 
     try {
-      // Criar backup antes
-      const backupPath = await this.backupZone(zone);
+      // Resolver a zona correta a partir do nome do registro.
+      // No WHM cada dominio tem zona DNS independente; o usuario/LLM pode informar
+      // a conta ou dominio principal por engano. resolveZone corrige isso.
+      const { resolveZone } = require('./dns-helpers/zone-resolver');
+      let availableZones = [];
+      try {
+        const zonesResult = await this.listZones();
+        availableZones = (zonesResult?.data?.zones || []).map(z => z.zone).filter(Boolean);
+      } catch (_) { /* sem lista de zonas, resolveZone cai no fallback de zona informada */ }
 
-      // Adicionar registro
+      const resolution = resolveZone(name, zone, availableZones);
+      if (resolution.error) {
+        throw new Error(resolution.error);
+      }
+      const effectiveZone = resolution.zone;
+      const effectiveName = resolution.recordName;
+
+      // Criar backup antes
+      const backupPath = await this.backupZone(effectiveZone);
+
+      // Adicionar registro (zona e nome ja resolvidos/normalizados)
       const result = await withTimeout(
-        () => this.whm.addZoneRecord(zone, type, name, data),
+        () => this.whm.addZoneRecord(effectiveZone, type, effectiveName, data),
         getTimeoutByType('DNS'),
         'whm_cpanel_create_dns_record'
       );
 
       // Invalidar cache da zona apos escrita
-      dnsCache.invalidatePattern(zone);
+      dnsCache.invalidatePattern(effectiveZone);
 
       const [seconds, nanoseconds] = process.hrtime(startTime);
       dnsOperationDuration.observe(
@@ -503,9 +520,9 @@ class DNSService {
       );
 
       // Fetch the actual created record from zone for accurate display
-      let createdRecord = { type, name, ...data };
+      let createdRecord = { type, name: effectiveName, ...data };
       try {
-        const zoneAfter = await this.getZone(zone);
+        const zoneAfter = await this.getZone(effectiveZone);
         const allRecords = zoneAfter?.data?.records || [];
         // Find the newly created record (last matching type+name)
         const matches = allRecords.filter(r => r.type === type);
@@ -514,11 +531,16 @@ class DNSService {
         }
       } catch (_) { /* use constructed fallback */ }
 
+      const message = resolution.warning
+        ? `${type} record added successfully em "${effectiveZone}". ${resolution.warning}`
+        : `${type} record added successfully em "${effectiveZone}"`;
+
       return {
         success: true,
         data: {
-          message: `${type} record added successfully`,
+          message,
           record: createdRecord,
+          zone: effectiveZone,
           backup_created: backupPath
         }
       };

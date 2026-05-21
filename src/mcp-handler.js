@@ -314,21 +314,21 @@ function buildToolDefinitions() {
     },
     {
       name: 'whm_cpanel_manage_dns_zone_records',
-      description: 'Registros DNS e apontamentos no WHM/cPanel — criar, atualizar ou deletar registros em zonas DNS do servidor. Use create para novo registro (A, CNAME, MX, TXT), update/delete com numero de linha obtido via search. reset_zone recria zona inteira. Acoes destrutivas requerem confirmationToken. Retorna Markdown do servidor WHM.',
+      description: 'Registros DNS e apontamentos no WHM/cPanel — criar, atualizar ou deletar registros em zonas DNS do servidor. CONCEITO IMPORTANTE: DNS opera por ZONA, e cada dominio hospedado tem sua propria zona DNS independente, mesmo que varios dominios pertencam a mesma conta cPanel. O username da conta e o dominio principal NAO importam para DNS — o que importa e a qual zona o registro pertence. Para create, basta informar o name como FQDN (ex: "teste.qualquerdominio.com") que a zona correta e detectada automaticamente. Use create para novo registro (A, CNAME, MX, TXT), update/delete com numero de linha obtido via search. reset_zone recria zona inteira. Acoes destrutivas requerem confirmationToken. Retorna Markdown do servidor WHM.',
       inputSchema: {
         type: 'object',
         properties: {
           action: {
             type: 'string',
             enum: ['create', 'update', 'delete', 'reset_zone', 'create_mx'],
-            description: 'create = novo registro (requer zone + type + name + valor). update = alterar registro existente (requer zone + line). delete = remover registro (requer zone + line + confirmationToken). reset_zone = resetar zona inteira (requer zone + confirmationToken, DESTRUTIVO). create_mx = adicionar MX (requer domain + exchange)'
+            description: 'create = novo registro (requer type + name + valor; zone e OPCIONAL, detectada do name). update = alterar registro existente (requer zone + line). delete = remover registro (requer zone + line + confirmationToken). reset_zone = resetar zona inteira (requer zone + confirmationToken, DESTRUTIVO). create_mx = adicionar MX (requer domain + exchange)'
           },
-          zone: { type: 'string', description: 'Nome da zona DNS. Obrigatorio para create, update, delete, reset_zone. Ex: dominio.com.br' },
+          zone: { type: 'string', description: 'Nome da zona DNS (= o dominio cuja zona contem o registro). Para create e OPCIONAL: se omitida, e inferida automaticamente do sufixo do name (ex: name="teste.exemplo.com" -> zona "exemplo.com"). Obrigatoria para update, delete, reset_zone. NAO confundir com username da conta nem com o dominio principal da conta — a zona e o dominio do proprio registro. Ex: exemplo.com.br' },
           domain: { type: 'string', description: 'Nome do dominio. Obrigatorio APENAS para create_mx. Ex: dominio.com.br' },
           type: { type: 'string', enum: ['A', 'AAAA', 'CNAME', 'MX', 'TXT', 'NS', 'PTR'], description: 'Tipo do registro DNS. Obrigatorio para create' },
-          name: { type: 'string', description: 'Nome FQDN do registro com ponto final. Obrigatorio para create. Ex: mail.dominio.com.br.' },
+          name: { type: 'string', description: 'Nome do registro. Para create, prefira o FQDN completo (ex: "teste.exemplo.com" ou "teste.exemplo.com."): a zona e detectada automaticamente a partir dele. Aceita tambem nome relativo (ex: "teste") desde que a zona seja informada. Ex: mail.exemplo.com.br' },
           line: { type: 'integer', description: 'Numero da linha do registro na zona. Obrigatorio para update e delete. Obtenha via search_dns_zone_records com searchType=records' },
-          expected_content: { type: 'string', description: 'Valor esperado do registro para verificacao de concorrencia. Recomendado para update e delete para prevenir edicao de registro errado' },
+          expected_content: { type: 'string', description: 'Conteudo COMPLETO esperado da linha do registro (formato BIND: "nome. TTL IN TIPO valor", ex: "teste.exemplo.com. 14400 IN A 192.0.2.1") para verificacao de concorrencia (optimistic lock). Obtenha o valor exato via search_dns_zone_records. Opcional mas recomendado em update/delete para evitar editar o registro errado. Se omitido, a operacao prossegue sem checagem de concorrencia.' },
           address: { type: 'string', description: 'Endereco IP. Usado para registros tipo A e AAAA. Ex: 192.0.2.1' },
           cname: { type: 'string', description: 'Dominio alvo. Usado para registros tipo CNAME. Ex: outro.dominio.com.' },
           exchange: { type: 'string', description: 'Servidor de email. Usado para registros MX e create_mx. Ex: mail.dominio.com.br.' },
