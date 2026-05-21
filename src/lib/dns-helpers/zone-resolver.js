@@ -129,4 +129,78 @@ function toFqdn(name) {
   return n ? `${n}.` : '';
 }
 
-module.exports = { resolveZone, normalizeDomainName, toFqdn };
+/**
+ * Valida que uma zona existe na lista de zonas do servidor.
+ * Usado por operacoes que recebem zona explicita (sem name para inferir):
+ * records, mx_records, nested_subdomains, reset_zone, dnssec.
+ *
+ * @param {string} zone - Zona a validar.
+ * @param {string[]} availableZones - Lista de zonas existentes.
+ * @returns {{ valid: boolean, zone: string|null, error: string|null }}
+ */
+function validateZone(zone, availableZones) {
+  const z = normalizeDomainName(zone);
+  const zones = (availableZones || []).map(normalizeDomainName).filter(Boolean);
+  if (!z) return { valid: false, zone: null, error: 'Parametro de zona/dominio e obrigatorio.' };
+  // Sem lista de zonas (ex: falha ao listar), nao bloquear — deixar o WHM decidir
+  if (zones.length === 0) return { valid: true, zone: z, error: null };
+  if (zones.includes(z)) return { valid: true, zone: z, error: null };
+  // Tentar inferir caso tenham passado um FQDN de registro como se fosse zona
+  const suffixMatch = zones.filter(zn => z === zn || z.endsWith('.' + zn)).sort((a, b) => b.length - a.length)[0];
+  if (suffixMatch) {
+    return {
+      valid: true, zone: suffixMatch, error: null,
+      warning: `"${z}" pertence a zona "${suffixMatch}". Usando a zona "${suffixMatch}".`
+    };
+  }
+  return {
+    valid: false, zone: null,
+    error: `Zona "${z}" nao existe no servidor. ` +
+           `DNS opera por zona (modelo de delegacao hierarquica): cada dominio hospedado tem zona propria, ` +
+           `independente da conta cPanel. Zonas disponiveis (amostra): ${zones.slice(0, 8).join(', ')}${zones.length > 8 ? '...' : ''}. ` +
+           `Use search_dns_zone_records (searchType=zones) para listar todas.`
+  };
+}
+
+// ============================================
+// Cache de lista de zonas (TTL) — evita N chamadas WHM em operacoes batch
+// ============================================
+
+const ZONE_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutos
+let _zoneCache = { zones: null, expiresAt: 0 };
+
+/**
+ * Retorna a lista de zonas do servidor, com cache TTL.
+ * @param {Function} listZonesFn - Funcao async que retorna a resposta de listagem de zonas
+ *   (aceita formato WHM { data: { zone: [...] } } ou dns-service { data: { zones: [...] } }).
+ * @returns {Promise<string[]>} Lista de nomes de zona.
+ */
+async function getAvailableZones(listZonesFn) {
+  const now = Date.now();
+  if (_zoneCache.zones && now < _zoneCache.expiresAt) {
+    return _zoneCache.zones;
+  }
+  try {
+    const result = await listZonesFn();
+    const raw = result?.data?.zone || result?.data?.zones || [];
+    const zones = raw.map(z => (typeof z === 'string' ? z : (z.domain || z.zone))).filter(Boolean);
+    _zoneCache = { zones, expiresAt: now + ZONE_CACHE_TTL_MS };
+    return zones;
+  } catch (_) {
+    // Em falha, devolver cache antigo se houver, senao vazio (resolveZone/validateZone tratam vazio)
+    return _zoneCache.zones || [];
+  }
+}
+
+/**
+ * Invalida o cache de zonas. Chamar apos criar/remover dominios ou contas.
+ */
+function invalidateZoneCache() {
+  _zoneCache = { zones: null, expiresAt: 0 };
+}
+
+module.exports = {
+  resolveZone, normalizeDomainName, toFqdn,
+  validateZone, getAvailableZones, invalidateZoneCache,
+  ZONE_CACHE_TTL_MS
+};

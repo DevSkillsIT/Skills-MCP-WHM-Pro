@@ -280,7 +280,7 @@ function buildToolDefinitions() {
     // ==========================================
     {
       name: 'whm_cpanel_search_dns_zone_records',
-      description: 'Zonas DNS, registros e apontamentos no WHM/cPanel — consulta completa de zonas e seus registros (A, AAAA, CNAME, MX, TXT, NS). Use zones para listar zonas, records para registros de uma zona, search para buscar registro especifico, mx_records para MX de um dominio. Retorna tabela Markdown do servidor WHM. Somente leitura.',
+      description: 'Zonas DNS, registros e apontamentos no WHM/cPanel — consulta completa de zonas e seus registros (A, AAAA, CNAME, MX, TXT, NS). CONCEITO: DNS segue o modelo de delegacao hierarquica — cada dominio hospedado tem sua propria zona, independente da conta cPanel ou do dominio principal da conta. A zona de um registro e o sufixo de dominio mais especifico (ex: registros de "x.exemplo.com" ficam na zona "exemplo.com"). Use zones para listar zonas, records para registros de uma zona, search para buscar registro especifico, mx_records para MX de um dominio. Se a zona informada nao existir, o erro lista as zonas disponiveis. Retorna tabela Markdown do servidor WHM. Somente leitura.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1087,6 +1087,25 @@ class MCPHandler {
         const action = args.action;
         if (!action) throw new Error('action obrigatorio para manage_dnssec');
 
+        // Validar que cada dominio informado existe como zona DNS no servidor.
+        // DNSSEC opera por zona; um dominio que nao e zona local nao tem DNSSEC gerenciavel aqui.
+        if (Array.isArray(args.domains) && args.domains.length > 0) {
+          const { validateZone, getAvailableZones } = require('./lib/dns-helpers/zone-resolver');
+          const zones = await getAvailableZones(() => this.dnsService.listZones());
+          const invalid = [];
+          for (const d of args.domains) {
+            const v = validateZone(d, zones);
+            if (!v.valid) invalid.push(d);
+          }
+          if (invalid.length > 0) {
+            throw new Error(
+              `Os seguintes dominios nao sao zonas DNS locais neste servidor: ${invalid.join(', ')}. ` +
+              `DNSSEC opera por zona (cada dominio hospedado tem zona propria, independente da conta cPanel). ` +
+              `Use search_dns_zone_records (searchType=zones) para ver as zonas disponiveis.`
+            );
+          }
+        }
+
         switch (action) {
           case 'get_ds_records':
             return await withOperationTimeout(
@@ -1137,6 +1156,30 @@ class MCPHandler {
   /**
    * Executa tools DNS consolidadas (search_dns, manage_dns)
    */
+  /**
+   * Resolve/valida a zona DNS de uma operacao antes de executa-la.
+   * - Se um FQDN (name/domain) for fornecido, infere/corrige a zona pelo sufixo.
+   * - Caso contrario, valida que a zona informada existe no servidor.
+   * Usa cache TTL de zonas para evitar chamadas WHM repetidas em batch.
+   *
+   * @param {{ zone?: string, name?: string }} opts
+   * @returns {Promise<{ zone: string, recordName: string|null, warning: string|null }>}
+   * @throws {Error} com mensagem orientativa quando a zona nao pode ser resolvida/validada
+   */
+  async resolveDnsZone({ zone, name }) {
+    const { resolveZone, validateZone, getAvailableZones } = require('./lib/dns-helpers/zone-resolver');
+    const availableZones = await getAvailableZones(() => this.dnsService.listZones());
+
+    if (name) {
+      const r = resolveZone(name, zone, availableZones);
+      if (r.error) throw new Error(r.error);
+      return { zone: r.zone, recordName: r.recordName, warning: r.warning };
+    }
+    const v = validateZone(zone, availableZones);
+    if (!v.valid) throw new Error(v.error);
+    return { zone: v.zone, recordName: null, warning: v.warning || null };
+  }
+
   async executeDnsTool(name, args) {
     if (!this.dnsService) {
       throw new Error('DNS service not configured');
@@ -1154,10 +1197,11 @@ class MCPHandler {
               'whm_cpanel_search_dns_zone_records'
             );
 
-          case 'records':
+          case 'records': {
             if (!args.zone) throw new Error('zone obrigatorio para searchType=records');
+            const { zone: rZone } = await this.resolveDnsZone({ zone: args.zone });
             return await withOperationTimeout(
-              () => this.dnsService.getZone(args.zone, {
+              () => this.dnsService.getZone(rZone, {
                 record_type: args.record_type,
                 name_filter: args.name_filter,
                 max_records: args.max_records,
@@ -1165,39 +1209,48 @@ class MCPHandler {
               }),
               'whm_cpanel_search_dns_zone_records'
             );
+          }
 
-          case 'search':
+          case 'search': {
             if (!args.zone || !args.name) throw new Error('zone e name obrigatorios para searchType=search');
+            const { zone: sZone } = await this.resolveDnsZone({ zone: args.zone, name: args.name });
             return await withOperationTimeout(
               () => this.dnsService.searchRecord(
-                args.zone,
+                sZone,
                 args.name,
                 args.type || ['A', 'AAAA'],
                 args.match_mode || 'exact'
               ),
               'whm_cpanel_search_dns_zone_records'
             );
+          }
 
-          case 'mx_records':
+          case 'mx_records': {
             if (!args.domain) throw new Error('domain obrigatorio para searchType=mx_records');
+            const { zone: mxZone } = await this.resolveDnsZone({ zone: args.domain });
             return await withOperationTimeout(
-              () => this.whmService.listMXRecords(args.domain),
+              () => this.whmService.listMXRecords(mxZone),
               'whm_cpanel_search_dns_zone_records'
             );
+          }
 
-          case 'nested_subdomains':
+          case 'nested_subdomains': {
             if (!args.zone) throw new Error('zone obrigatorio para searchType=nested_subdomains');
+            const { zone: nZone } = await this.resolveDnsZone({ zone: args.zone });
             return await withOperationTimeout(
-              () => this.dnsService.checkNestedDomains(args.zone),
+              () => this.dnsService.checkNestedDomains(nZone),
               'whm_cpanel_search_dns_zone_records'
             );
+          }
 
-          case 'alias_check':
+          case 'alias_check': {
             if (!args.zone || !args.name) throw new Error('zone e name obrigatorios para searchType=alias_check');
+            const { zone: aZone } = await this.resolveDnsZone({ zone: args.zone, name: args.name });
             return await withOperationTimeout(
-              () => this.whmService.isAliasAvailable(args.zone, args.name),
+              () => this.whmService.isAliasAvailable(aZone, args.name),
               'whm_cpanel_search_dns_zone_records'
             );
+          }
 
           default:
             throw new Error(`searchType invalido: ${searchType}. Valores aceitos: zones, records, search, mx_records, nested_subdomains, alias_check`);
@@ -1224,11 +1277,14 @@ class MCPHandler {
               'whm_cpanel_manage_dns_zone_records'
             );
 
-          case 'update':
+          case 'update': {
             SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            // Validar que a zona existe (NAO auto-corrigir via name: o "line" esta atrelado
+            // a zona informada; trocar a zona invalidaria o line. expected_content protege o resto).
+            const { zone: uZone } = await this.resolveDnsZone({ zone: args.zone });
             return await withOperationTimeout(
               () => this.dnsService.editRecord(
-                args.zone,
+                uZone,
                 args.line,
                 {
                   type: args.type,
@@ -1246,31 +1302,37 @@ class MCPHandler {
               ),
               'whm_cpanel_manage_dns_zone_records'
             );
+          }
 
-          case 'delete':
+          case 'delete': {
             SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            const { zone: dZone } = await this.resolveDnsZone({ zone: args.zone });
             return await withOperationTimeout(
-              () => this.dnsService.deleteRecord(args.zone, args.line, args.expected_content),
+              () => this.dnsService.deleteRecord(dZone, args.line, args.expected_content),
               'whm_cpanel_manage_dns_zone_records'
             );
+          }
 
-          case 'reset_zone':
+          case 'reset_zone': {
             SafetyGuard.requireConfirmation('whm_cpanel_manage_dns_zone_records', args);
+            const { zone: rzZone } = await this.resolveDnsZone({ zone: args.zone });
             return await withOperationTimeout(
-              () => this.dnsService.resetZone(args.zone),
+              () => this.dnsService.resetZone(rzZone),
               'whm_cpanel_manage_dns_zone_records'
             );
+          }
 
-          case 'create_mx':
+          case 'create_mx': {
             // Use addzonerecord with type=MX (writes to DNS zone file)
             // savemxs only configures mail routing, not DNS records
             if (!args.domain) throw new Error('domain obrigatorio para create_mx');
             if (!args.exchange) throw new Error('exchange obrigatorio para create_mx');
+            const { zone: mxcZone } = await this.resolveDnsZone({ zone: args.domain });
             return await withOperationTimeout(
               () => this.dnsService.addRecord(
-                args.domain,
+                mxcZone,
                 'MX',
-                args.domain + '.',
+                mxcZone + '.',
                 {
                   exchange: args.exchange,
                   preference: args.priority || 10,
@@ -1279,6 +1341,7 @@ class MCPHandler {
               ),
               'whm_cpanel_manage_dns_zone_records'
             );
+          }
 
           default:
             throw new Error(`action invalida: ${action}. Valores aceitos: create, update, delete, reset_zone, create_mx`);

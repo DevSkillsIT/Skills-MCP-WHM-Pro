@@ -7,6 +7,30 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.2.0] - 2026-05-21
+
+### Adicionado
+
+- 🆕 **Resolucao/validacao de zona em TODAS as operacoes DNS/DNSSEC** (antes so no create):
+  - **Escrita**: create_mx, update, delete, reset_zone agora validam/resolvem a zona antes de executar
+  - **Leitura**: records, search, mx_records, nested_subdomains, alias_check resolvem/validam a zona (FQDN passado como zona e auto-corrigido para a zona real)
+  - **DNSSEC**: get_ds_records, enable_nsec3, disable_nsec3 validam que cada dominio informado e uma zona local; erro orientativo lista zonas disponiveis
+- 🆕 **Cache TTL de zonas** (`getAvailableZones`, TTL 5min): operacoes em batch (ex: migracao de DNS) reutilizam uma unica chamada de listagem em vez de N chamadas WHM. `invalidateZoneCache()` exposto para forcar refresh.
+- 🆕 **`validateZone()`**: valida que uma zona existe; se receber um FQDN de registro no lugar da zona, infere a zona pelo sufixo. Mensagem de erro lista zonas disponiveis.
+- 🆕 10 testes unit adicionais (validateZone + cache de zonas).
+
+### Modificado
+
+- `search_dns_zone_records` (descricao): reforca o modelo de delegacao hierarquica do DNS — a zona e o sufixo de dominio mais especifico, independente da conta cPanel.
+- `update`/`delete` validam a zona sem auto-troca (o parametro `line` esta atrelado a zona; expected_content protege concorrencia).
+
+### Testes
+
+- ✅ **762/762 testes** passando (10 novos)
+- ✅ Validacao ao vivo: zona inexistente -> erro orientativo; FQDN como zona -> auto-correcao para a zona real
+
+---
+
 ## [2.1.0] - 2026-05-21
 
 ### Adicionado

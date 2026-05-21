@@ -486,12 +486,8 @@ class DNSService {
       // Resolver a zona correta a partir do nome do registro.
       // No WHM cada dominio tem zona DNS independente; o usuario/LLM pode informar
       // a conta ou dominio principal por engano. resolveZone corrige isso.
-      const { resolveZone } = require('./dns-helpers/zone-resolver');
-      let availableZones = [];
-      try {
-        const zonesResult = await this.listZones();
-        availableZones = (zonesResult?.data?.zones || []).map(z => z.zone).filter(Boolean);
-      } catch (_) { /* sem lista de zonas, resolveZone cai no fallback de zona informada */ }
+      const { resolveZone, getAvailableZones } = require('./dns-helpers/zone-resolver');
+      const availableZones = await getAvailableZones(() => this.listZones());
 
       const resolution = resolveZone(name, zone, availableZones);
       if (resolution.error) {
