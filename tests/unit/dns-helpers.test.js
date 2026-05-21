@@ -156,6 +156,23 @@ describe('DNS Parser', () => {
     { line: 5, type: 'MX', name: 'example.com.', ttl: 14400, exchange: 'mail.example.com.', priority: 10 }
   ];
 
+  describe('parseZoneRecords pseudo-record filtering', () => {
+    test('exclui pseudo-registros (:RAW, $TTL) e conta apenas registros reais', () => {
+      const zoneData = {
+        record: [
+          { Line: 1, type: ':RAW', raw: '; cPanel header' },
+          { Line: 2, type: ':RAW', raw: '; Zone file' },
+          { Line: 3, type: '$TTL', ttl: '3600' },
+          { Line: 4, type: 'SOA', name: 'ex.com.', ttl: 86400 },
+          { Line: 5, type: 'A', name: 'ex.com.', ttl: 3600, address: '1.2.3.4' }
+        ]
+      };
+      const parsed = parseZoneRecords(zoneData);
+      expect(parsed.length).toBe(2); // SOA + A, sem os 3 pseudo
+      expect(parsed.every(r => ![':RAW', '$TTL'].includes(r.type))).toBe(true);
+    });
+  });
+
   describe('extractRecordsByType', () => {
     test('filtra por tipo único', () => {
       const aRecords = extractRecordsByType(mockRecords, 'A');

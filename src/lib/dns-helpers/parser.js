@@ -15,6 +15,10 @@ const logger = require('../logger');
  * @param {object} zoneData - Dados brutos da zona DNS
  * @returns {Array} Array de registros parseados
  */
+// Pseudo-registros: metadados de zona BIND, nao sao registros DNS reais.
+// Filtrados aqui (na raiz) para que limites/contagens considerem apenas registros reais.
+const PSEUDO_RECORD_TYPES = new Set([':RAW', '$TTL', '$ORIGIN', '$INCLUDE', '$GENERATE']);
+
 function parseZoneRecords(zoneData) {
   const records = [];
 
@@ -25,6 +29,11 @@ function parseZoneRecords(zoneData) {
   const rawRecords = Array.isArray(zoneData.record) ? zoneData.record : [zoneData.record];
 
   for (const record of rawRecords) {
+    // Pular pseudo-registros (metadados de zona): :RAW, $TTL, $ORIGIN, etc.
+    if (PSEUDO_RECORD_TYPES.has(String(record.type || '').toUpperCase()) ||
+        PSEUDO_RECORD_TYPES.has(String(record.type || ''))) {
+      continue;
+    }
     try {
       const parsed = {
         line: record.Line || record.line,

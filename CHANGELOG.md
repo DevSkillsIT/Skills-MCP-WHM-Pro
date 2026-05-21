@@ -7,6 +7,20 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ---
 
+## [2.2.1] - 2026-05-21
+
+### Corrigido
+
+- 🐛 **max_records vs pseudo-registros**: o limite de registros era aplicado ANTES do filtro de pseudo-registros de zona (`:RAW`, `$TTL`, etc.), entao um `max_records` baixo podia retornar vazio se os primeiros registros fossem metadados (ex: `max_records=3` numa zona cujas 3 primeiras linhas sao `:RAW`/`:RAW`/`$TTL` retornava 0 resultados). Agora os pseudo-registros sao filtrados na raiz (`parseZoneRecords`), de modo que o limite conta apenas registros DNS reais. Afeta records, search e nested_subdomains (tudo que usa parseZoneRecords).
+- Teste unit adicionado garantindo que parseZoneRecords exclui pseudo-registros.
+
+### Testes
+
+- ✅ **763/763 testes** passando
+- ✅ Validacao ao vivo: `records` com `max_records=3` agora retorna 3 registros reais (antes: vazio)
+
+---
+
 ## [2.2.0] - 2026-05-21
 
 ### Adicionado
