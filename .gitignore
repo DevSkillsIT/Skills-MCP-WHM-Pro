@@ -61,3 +61,6 @@ QUALITY_GATE_REPORT.md
 quality_verification.xml
 Fluxo-Dev-SkillsIT/
 .moai/
+# `*.bak` nao casa com sufixo (ex: safety-guard.js.bak-bug8) — 2026-08-12
+*.bak-*
+*.bak.*
