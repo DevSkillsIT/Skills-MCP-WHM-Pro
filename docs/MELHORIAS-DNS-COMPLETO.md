@@ -736,7 +736,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "params": {
       "name": "dns.search_record",
       "arguments": {
-        "zone": "servidor.one",
+        "zone": "dominio.com.br",
         "name": "prometheus",
         "type": ["A", "AAAA"],
         "matchMode": "exact"
@@ -1121,7 +1121,7 @@ curl -X POST http://mcp.example.com:3200/mcp \
     "params": {
       "name": "dns.search_record",
       "arguments": {
-        "zone": "servidor.one",
+        "zone": "dominio.com.br",
         "name": "prometheus",
         "type": ["A", "AAAA"]
       }
