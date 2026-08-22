@@ -110,7 +110,7 @@ e este projeto adere ao [Semantic Versioning](https://semver.org/lang/pt-BR/).
 
 ### Segurança
 
-- 🔒 **Anonimização de exemplos didáticos**: substituídos `skillsit.com.br`/`smartskills.com.br`/`grupowink.com`/`skillsitcom` por placeholders neutros (`dominio.com.br`, `outrodominio.com.br`, `nameserver.com.br`, `usuariocpanel`) em descriptions de tools e JSDoc visíveis via `tools/list`
+- 🔒 **Anonimização de exemplos didáticos**: substituídos dominios reais de clientes e o usuario cPanel correspondente por placeholders neutros (`dominio.com.br`, `outrodominio.com.br`, `nameserver.com.br`, `usuariocpanel`) em descriptions de tools e JSDoc visíveis via `tools/list`
 - 🔒 `.gitignore` agora ignora `.local-docs/`, `AUDIT-*.md`, `POSTMORTEM-*.md` (documentos operacionais com dados de infra real)
 - 🔒 Auditoria pré-commit confirmou: zero tokens/passwords/API keys hardcoded; `.env` e `*.pem`/`*.ppk`/`*.key` ignorados; IP real e hostname interno fora de qualquer arquivo committado
 
