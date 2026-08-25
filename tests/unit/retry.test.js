@@ -3,7 +3,7 @@
  * Testes unitários para BUG-CRIT-02
  */
 
-const { withRetry, getRetryAfterMs, calculateBackoffDelay, sleep } = require('../../src/lib/retry');
+const { withRetry, getRetryAfterMs, calculateBackoffDelay, sleep, isRetryableError } = require('../../src/lib/retry');
 
 describe('Retry System', () => {
   describe('Retry-After Header Handling', () => {
@@ -324,15 +324,17 @@ describe('Retry System', () => {
       jest.useRealTimers();
     });
 
-    it('deve fazer retry para erro de rede', async () => {
+    it('deve fazer retry para erro de rede transitorio (ECONNRESET)', async () => {
       jest.useFakeTimers();
 
       let callCount = 0;
       const mockFn = jest.fn().mockImplementation(() => {
         callCount++;
         if (callCount === 1) {
-          const error = new Error('Network error');
-          // Sem error.response = erro de rede
+          // Erro de rede REAL sempre carrega um code. Ausencia de `response`
+          // sozinha nao caracteriza falha transitoria.
+          const error = new Error('socket hang up');
+          error.code = 'ECONNRESET';
           throw error;
         }
         return { success: true };
@@ -348,6 +350,56 @@ describe('Retry System', () => {
       expect(callCount).toBe(2);
 
       jest.useRealTimers();
+    });
+  });
+
+  describe('Erros permanentes nao devem ser repetidos', () => {
+    // Regressao: o WHM injeta uma linha de log no bloco de headers do
+    // /servicestatus. Sem esta classificacao, o erro de parse (deterministico)
+    // era repetido 5x com backoff, gastando ~30s e estourando o deadline do
+    // cliente antes de qualquer fallback rodar.
+    it('nao repete erro de parse HTTP (HPE_*)', async () => {
+      const error = new Error('Parse Error: Invalid header token');
+      error.code = 'HPE_INVALID_HEADER_TOKEN';
+
+      expect(isRetryableError(error)).toBe(false);
+
+      const mockFn = jest.fn().mockRejectedValue(error);
+      await expect(withRetry(mockFn, { maxRetries: 5, baseDelay: 1 })).rejects.toThrow('Parse Error');
+      expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('nao repete erro de negocio do WHM (metadata.result=0)', async () => {
+      const error = new Error('Account does not exist.');
+      error.name = 'WHMError';
+
+      expect(isRetryableError(error)).toBe(false);
+
+      const mockFn = jest.fn().mockRejectedValue(error);
+      await expect(withRetry(mockFn, { maxRetries: 5, baseDelay: 1 })).rejects.toThrow('Account does not exist.');
+      expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('nao repete erro de programacao (TypeError)', async () => {
+      const error = new TypeError("Cannot read properties of undefined (reading 'data')");
+
+      expect(isRetryableError(error)).toBe(false);
+
+      const mockFn = jest.fn().mockRejectedValue(error);
+      await expect(withRetry(mockFn, { maxRetries: 5, baseDelay: 1 })).rejects.toThrow(TypeError);
+      expect(mockFn).toHaveBeenCalledTimes(1);
+    });
+
+    it('nao repete erro generico sem code de rede conhecido', async () => {
+      expect(isRetryableError(new Error('algo deu errado'))).toBe(false);
+    });
+
+    it('continua repetindo codes de rede transitorios', () => {
+      for (const code of ['ECONNRESET', 'ETIMEDOUT', 'ECONNREFUSED', 'EAI_AGAIN', 'ECONNABORTED']) {
+        const err = new Error(code);
+        err.code = code;
+        expect(isRetryableError(err)).toBe(true);
+      }
     });
   });
 });

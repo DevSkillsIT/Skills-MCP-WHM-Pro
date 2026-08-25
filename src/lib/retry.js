@@ -31,17 +31,71 @@ function calculateBackoffDelay(attempt, baseDelay = 1000, maxDelay = 32000, jitt
 }
 
 /**
- * Verifica se erro e retriavel
+ * Codigos de erro de rede que sao transitorios — vale repetir.
+ * Qualquer coisa fora desta lista sem `response` e tratada como permanente.
+ */
+const TRANSIENT_NETWORK_CODES = new Set([
+  'ECONNRESET',
+  'ECONNREFUSED',
+  'ECONNABORTED',   // axios timeout
+  'ETIMEDOUT',
+  'ESOCKETTIMEDOUT',
+  'EPIPE',
+  'EAI_AGAIN',      // falha temporaria de DNS
+  'ENOTFOUND',      // DNS: pode ser falha transitoria de resolver
+  'EHOSTUNREACH',
+  'ENETUNREACH',
+  'ENETDOWN',
+  'EBUSY'
+]);
+
+/**
+ * Erros de programacao — repetir so multiplica o mesmo bug.
+ */
+const PROGRAMMING_ERRORS = new Set(['TypeError', 'ReferenceError', 'SyntaxError', 'RangeError']);
+
+/**
+ * Verifica se erro e retriavel.
+ *
+ * Regra anterior: "sem response => retriavel", o que fazia 5 tentativas em erros
+ * DETERMINISTICOS (parse de header malformado do WHM, erro de negocio com
+ * metadata.result=0, TypeError no proprio codigo). Cada rodada custava ~30s e
+ * estourava o deadline do cliente antes de qualquer fallback rodar.
+ *
  * @param {Error} error - Erro a verificar
  * @returns {boolean} true se deve fazer retry
  */
 function isRetryableError(error) {
-  // Erros de rede sao retriaveis
-  if (!error.response) {
-    return true;
+  if (!error) return false;
+
+  // 1. Erro de parse HTTP (HPE_*): a resposta do servidor esta malformada.
+  //    Repetir produz exatamente o mesmo byte invalido. Nunca e transitorio.
+  if (typeof error.code === 'string' && error.code.startsWith('HPE_')) {
+    return false;
   }
 
-  // Status codes retriaveis
+  // 2. Erro de negocio do WHM (metadata.result === 0): resposta valida dizendo
+  //    "nao existe" / "sem permissao". Repetir nao muda a resposta.
+  if (error.name === 'WHMError') {
+    return false;
+  }
+
+  // 3. Bug no nosso proprio codigo.
+  if (PROGRAMMING_ERRORS.has(error.name)) {
+    return false;
+  }
+
+  // 4. Erros de validacao/uso indevido do Node (ERR_INVALID_ARG_TYPE etc).
+  if (typeof error.code === 'string' && error.code.startsWith('ERR_') && error.code !== 'ERR_SOCKET_TIMEOUT') {
+    return false;
+  }
+
+  // 5. Erro sem resposta HTTP: so repete se for codigo de rede transitorio conhecido.
+  if (!error.response) {
+    return TRANSIENT_NETWORK_CODES.has(error.code);
+  }
+
+  // 6. Status codes retriaveis
   const retryableStatusCodes = [
     408, // Request Timeout
     429, // Too Many Requests

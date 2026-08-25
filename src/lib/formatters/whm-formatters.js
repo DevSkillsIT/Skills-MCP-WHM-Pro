@@ -162,6 +162,29 @@ function formatServerConfig(data) {
     (d.license ? `\n| Licenca | ${esc(d.license)} |` : '');
 }
 
+/**
+ * Classifica o estado de um servico do WHM.
+ *
+ * Semantica REAL do /servicestatus (verificada no servidor de producao):
+ * - `running` so vem preenchido para servicos com `monitored: 1`.
+ * - `enabled` significa "configurado para subir", NAO "esta rodando".
+ * - `installed: 0` significa que o servico nem existe na maquina.
+ *
+ * O codigo anterior fazia `running || enabled`, entao cpgreylistd e tailwatchd
+ * (enabled=1, sem `running`) apareciam como "Ativo" sem nunca terem sido
+ * medidos, e nginx/postgresql (nao instalados) apareciam como "Parado".
+ * Os dois lados eram afirmacoes falsas.
+ *
+ * @param {object} s - Registro de servico do WHM
+ * @returns {{label: string, isRunning: boolean|null}} isRunning null = nao medido
+ */
+function serviceState(s) {
+  if (s.running === 1 || s.running === true) return { label: 'Ativo', isRunning: true };
+  if (s.running === 0 || s.running === false) return { label: '**Parado**', isRunning: false };
+  if (s.installed === 0 || s.installed === false) return { label: 'Nao instalado', isRunning: null };
+  return { label: 'Nao monitorado', isRunning: null };
+}
+
 function formatServicesStatus(data) {
   if (!data) return 'Status dos servicos nao disponivel.';
   // Handle both direct array and wrapped { services: [...] } or { service: [...] }
@@ -169,11 +192,16 @@ function formatServicesStatus(data) {
   if (Array.isArray(services) && services.length > 0) {
     const rows = services.map(s => {
       const name = s.name || s.service || 'unknown';
-      const isRunning = s.running === 1 || s.running === true || s.enabled === 1 || s.enabled === true;
       const monitored = s.monitored === 1 || s.monitored === true;
-      return `| ${esc(name)} | ${isRunning ? 'Ativo' : 'Parado'} | ${monitored ? 'Sim' : 'Nao'} |`;
+      return `| ${esc(name)} | ${serviceState(s).label} | ${monitored ? 'Sim' : 'Nao'} |`;
     }).join('\n');
-    return `**${services.length} servicos**\n\n| Servico | Status | Monitorado |\n|---|---|---|\n${rows}`;
+
+    const naoMedidos = services.filter(s => serviceState(s).isRunning === null).length;
+    const legenda = naoMedidos > 0
+      ? `\n\n_"Nao monitorado" e "Nao instalado" NAO significam parado nem ativo: o WHM so publica estado de execucao para servicos monitorados (${naoMedidos} sem medicao aqui)._`
+      : '';
+
+    return `**${services.length} servicos**\n\n| Servico | Status | Monitorado |\n|---|---|---|\n${rows}${legenda}`;
   }
   // Handle error or empty state
   if (data?.error) {
@@ -498,7 +526,7 @@ function formatConversionsList(data) {
 
 module.exports = {
   formatAccountsList, formatAccountDetail, formatAccountDomains,
-  formatServerStatus, formatServerConfig, formatServicesStatus,
+  formatServerStatus, formatServerConfig, formatServicesStatus, serviceState,
   formatDomainsList, formatDomainDetail,
   formatDomainOwner, formatDomainAuthority, formatResolveIp,
   formatDnsZonesList, formatDnsRecordsList, formatDnsRecordDetail, formatMxRecordsList,

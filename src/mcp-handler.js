@@ -15,7 +15,7 @@ const { formatToolResponse } = require('./lib/formatters/response-formatter');
 const { WHM_RESOURCES, listResources, readResource } = require('./lib/resources');
 const SafetyGuard = require('./lib/safety-guard');
 const { measureToolExecution, recordError } = require('./lib/metrics');
-const { withOperationTimeout, withTimeout, TimeoutError } = require('./lib/timeout');
+const { withOperationTimeout, withTimeout, withRequestDeadline, TimeoutError } = require('./lib/timeout');
 const dnsSchema = require('./schemas/dns-tools.json');
 const { enrichWHMError } = require('./lib/error-mapper');
 
@@ -557,20 +557,35 @@ class MCPHandler {
         case 'tools/list':
           return this.handleToolsList(id);
 
+        // Os tres metodos abaixo tocam o servidor WHM e podem demorar.
+        // Rodam sob deadline para que o servidor SEMPRE responda antes do
+        // cliente desistir — um erro explicado vale mais que `{"error": ""}`.
         case 'tools/call':
-          return await this.handleToolCall(id, params);
+          return await withRequestDeadline(
+            () => this.handleToolCall(id, params),
+            'tools/call',
+            params?.name
+          );
 
         case 'prompts/list':
           return this.handlePromptsList(id);
 
         case 'prompts/get':
-          return await this.handlePromptGet(id, params);
+          return await withRequestDeadline(
+            () => this.handlePromptGet(id, params),
+            'prompts/get',
+            params?.name
+          );
 
         case 'resources/list':
           return { jsonrpc: '2.0', id, result: { resources: listResources() } };
 
         case 'resources/read':
-          return await this.handleResourceRead(id, params);
+          return await withRequestDeadline(
+            () => this.handleResourceRead(id, params),
+            'resources/read',
+            params?.uri
+          );
 
         case 'notifications/initialized':
         case 'initialized':
@@ -1498,9 +1513,20 @@ class MCPHandler {
    */
   async handleResourceRead(id, params) {
     const { uri } = params || {};
+    const validUris = listResources().map(r => r.uri);
+
     if (!uri) {
-      return this.errorResponse(id, -32602, 'Invalid params', { reason: 'URI required' });
+      return this.errorResponse(id, -32602, 'Parametro `uri` obrigatorio.', { uris_validas: validUris });
     }
+
+    // URI desconhecida: ai sim o erro e do chamador.
+    if (!validUris.includes(uri)) {
+      return this.errorResponse(id, -32602, `URI desconhecida: "${uri}".`, {
+        uris_validas: validUris,
+        o_que_fazer: 'Use exatamente uma das URIs listadas em uris_validas.'
+      });
+    }
+
     try {
       const result = await readResource(uri, this.whmService, this.sshManager);
       return {
@@ -1511,7 +1537,16 @@ class MCPHandler {
         }
       };
     } catch (error) {
-      return this.errorResponse(id, -32602, error.message);
+      // A URI era valida — a falha veio do servidor WHM.
+      // Antes isto retornava -32602 (Invalid params), fazendo o modelo acreditar
+      // que tinha passado uma URI errada e tentar variacoes indefinidamente.
+      logger.error(`Falha ao ler resource ${uri}: ${error.message}`);
+      return this.errorResponse(id, -32000, `Falha ao ler ${uri}: ${enrichWHMError(error.message)}`, {
+        uri,
+        uri_estava_correta: true,
+        o_que_fazer: 'A URI esta certa e nao ha variacao a tentar. Informe a indisponibilidade ao usuario ou busque o dado por outra tool (ex: whm_cpanel_search_server_status).',
+        o_que_nao_adianta: 'Tentar outras grafias da URI — o problema esta na coleta no servidor WHM, nao no parametro.'
+      });
     }
   }
 

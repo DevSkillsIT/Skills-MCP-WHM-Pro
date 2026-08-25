@@ -12,6 +12,7 @@ const https = require('https');
 const logger = require('./logger');
 const { withRetry, calculateBackoffDelay } = require('./retry');
 const { withTimeout, getTimeoutByType } = require('./timeout');
+const { tolerantGetJson, isMalformedHeaderError } = require('./tolerant-http');
 const { recordWhmRequestDuration, recordRateLimitHit } = require('./metrics');
 const { acquireLock, releaseLock } = require('./lock-manager');
 const { getOperationStatus, startAsyncOperation } = require('./nsec3-async-handler');
@@ -76,6 +77,7 @@ class WHMService {
 
     // Configuracao de TLS
     const verifyTLS = config.verifyTLS !== false;
+    this.verifyTLS = verifyTLS;
     const httpsAgentOptions = {
       rejectUnauthorized: verifyTLS,
       // WHM injects malformed headers (e.g. service status lines without colon separator)
@@ -104,11 +106,19 @@ class WHMService {
     this.api.interceptors.response.use(
       response => response,
       error => {
-        logger.error('WHM API Error', {
+        const meta = {
           url: error.config?.url,
           status: error.response?.status,
           message: error.message
-        });
+        };
+        // Header malformado e recuperado pelo leitor tolerante logo em seguida.
+        // Registrar como ERROR aqui fazia o log acusar falha numa chamada que
+        // termina com sucesso e dados completos.
+        if (isMalformedHeaderError(error)) {
+          logger.debug('WHM API: headers malformados, acionando leitor tolerante', meta);
+        } else {
+          logger.error('WHM API Error', meta);
+        }
         return Promise.reject(error);
       }
     );
@@ -137,6 +147,55 @@ class WHMService {
   }
 
   /**
+   * Marca um endpoint como emissor de headers malformados.
+   * TTL evita fixar o desvio para sempre: se a cPanel corrigir o bug, o
+   * caminho normal volta a ser tentado apos a janela expirar.
+   */
+  static _markMalformed(endpoint) {
+    WHMService._malformedEndpoints.set(endpoint, Date.now() + WHMService.MALFORMED_TTL_MS);
+  }
+
+  static _isKnownMalformed(endpoint) {
+    const until = WHMService._malformedEndpoints.get(endpoint);
+    if (!until) return false;
+    if (Date.now() > until) {
+      WHMService._malformedEndpoints.delete(endpoint);
+      return false;
+    }
+    return true;
+  }
+
+  /**
+   * Fallback para respostas com headers malformados.
+   *
+   * O WHM injeta linhas de log do monitor de servicos no bloco de headers
+   * (visto em /servicestatus). O parser do Node descarta a resposta inteira,
+   * mesmo com insecureHTTPParser. Aqui relemos a resposta via socket TLS,
+   * descartando as linhas invalidas e preservando o corpo.
+   *
+   * O dado devolvido e COMPLETO — nao e resposta degradada.
+   */
+  async _getViaTolerantReader(endpoint, params) {
+    const fullParams = { ...params, 'api.version': 1 };
+    const queryString = new URLSearchParams(fullParams).toString();
+
+    const json = await tolerantGetJson({
+      host: this.host,
+      port: Number(this.port),
+      path: `/json-api/${endpoint}?${queryString}`,
+      headers: {
+        Authorization: `whm ${this.username}:${this.apiToken}`,
+        Accept: 'application/json'
+      },
+      rejectUnauthorized: this.verifyTLS,
+      timeout: getTimeoutByType('WHM_API')
+    });
+
+    // Mesma validacao de metadata do caminho normal (AC18)
+    return this.validateMetadata({ data: json });
+  }
+
+  /**
    * Requisicao GET com retry e validacao
    */
   async get(endpoint, params = {}) {
@@ -148,7 +207,25 @@ class WHMService {
         const queryString = new URLSearchParams(fullParams).toString();
         const url = `${endpoint}?${queryString}`;
 
-        const response = await this.api.get(url);
+        // Endpoint ja conhecido por devolver headers malformados: ir direto ao
+        // leitor tolerante em vez de pagar mais uma tentativa condenada (~6s).
+        if (WHMService._isKnownMalformed(endpoint)) {
+          return await this._getViaTolerantReader(endpoint, params);
+        }
+
+        let response;
+        try {
+          response = await this.api.get(url);
+        } catch (error) {
+          // Headers malformados do WHM: reler via socket tolerante em vez de
+          // perder a resposta. Nao e retry — e outro transporte para a MESMA
+          // requisicao, e roda uma unica vez.
+          if (isMalformedHeaderError(error)) {
+            WHMService._markMalformed(endpoint);
+            return await this._getViaTolerantReader(endpoint, params);
+          }
+          throw error;
+        }
 
         // Validar metadata (AC18)
         return this.validateMetadata(response);
@@ -1541,6 +1618,10 @@ class WHMService {
     };
   }
 }
+
+// Registro (por processo) de endpoints que devolvem headers malformados.
+WHMService._malformedEndpoints = new Map();
+WHMService.MALFORMED_TTL_MS = parseInt(process.env.WHM_MALFORMED_TTL_MS) || 15 * 60 * 1000;
 
 module.exports = WHMService;
 module.exports.WHMError = WHMError;

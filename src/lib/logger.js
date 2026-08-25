@@ -8,7 +8,9 @@ const path = require('path');
 
 // Padroes sensiveis para sanitizacao
 const SENSITIVE_PATTERNS = [
-  { pattern: /sk_whm_mcp_[a-z0-9_]+/gi, replacement: '[REDACTED:API_KEY]' },
+  // Qualquer segredo com prefixo sk_whm_ (api key, safety token, futuros).
+  // O padrao antigo cobria apenas sk_whm_mcp_ e deixava o safety token em texto puro.
+  { pattern: /sk_whm_[a-z0-9_]+/gi, replacement: '[REDACTED:WHM_SECRET]' },
   { pattern: /Bearer\s+[A-Za-z0-9+/=._-]+/gi, replacement: '[REDACTED:BEARER]' },
   { pattern: /whm\s+\w+:[A-Za-z0-9+/=._-]+/gi, replacement: '[REDACTED:WHM_AUTH]' },
   { pattern: /"password"\s*:\s*"[^"]*"/gi, replacement: '"password": "[REDACTED]"' },
@@ -24,6 +26,10 @@ const SENSITIVE_PATTERNS = [
 const SENSITIVE_HEADERS = [
   'authorization',
   'x-api-key',
+  'x-mcp-safety-token',
+  'x-mcp-acl-token',
+  'x-safety-token',
+  'x-acl-token',
   'cookie',
   'set-cookie'
 ];

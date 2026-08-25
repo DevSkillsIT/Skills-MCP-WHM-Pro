@@ -8,10 +8,63 @@
  * Convencoes:
  * - Toda funcao recebe (ctx, args) onde ctx = { whmService, sshManager }.
  * - Retorno SEMPRE: string Markdown.
- * - Em caso de falha parcial, continuar com best-effort e marcar "N/A" + nota.
+ * - Em caso de falha parcial, continuar com best-effort e MARCAR a lacuna.
+ *
+ * LEI DE NAO-MASCARAMENTO:
+ * Uma fonte que falhou nunca pode ser renderizada como resultado legitimo.
+ * `bestEffort` devolve um fallback vazio para o relatorio nao morrer inteiro,
+ * mas toda falha e registrada e vira uma secao "FONTES INDISPONIVEIS" no fim do
+ * relatorio. Sem isso, `listAccounts` falhando imprimia "Total: 0 contas" e um
+ * modelo fraco afirmava ao cliente que nao havia contas.
  */
 
-const { humanizeBytes, formatStartDate } = require('./formatters/whm-formatters');
+const { AsyncLocalStorage } = require('async_hooks');
+const { humanizeBytes, formatStartDate, serviceState } = require('./formatters/whm-formatters');
+
+/**
+ * Coletor de falhas com escopo POR RELATORIO.
+ * AsyncLocalStorage (e nao uma variavel de modulo) porque duas requisicoes
+ * concorrentes intercalam await e misturariam as falhas uma da outra.
+ */
+const failureStore = new AsyncLocalStorage();
+
+/**
+ * Registra uma fonte que nao pode ser lida.
+ * @param {string} source - Nome tecnico da fonte (ex: listAccounts)
+ * @param {Error|string} error - Erro capturado
+ */
+function recordSourceFailure(source, error) {
+  const store = failureStore.getStore();
+  if (!store) return;
+  const message = error?.message || String(error);
+  if (!store.failures.some(f => f.source === source && f.message === message)) {
+    store.failures.push({ source, message });
+  }
+}
+
+/**
+ * Renderiza o bloco de fontes indisponiveis. Retorna '' quando tudo foi lido.
+ */
+function renderSourceFailures() {
+  const store = failureStore.getStore();
+  const failures = store?.failures || [];
+  if (!failures.length) return '';
+
+  const lines = [
+    '',
+    '---',
+    '',
+    '## FONTES INDISPONIVEIS — LEIA ANTES DE CONCLUIR',
+    '',
+    'As fontes abaixo NAO puderam ser lidas nesta execucao:',
+    ''
+  ];
+  failures.forEach(f => lines.push(`- \`${f.source}\`: ${f.message}`));
+  lines.push('');
+  lines.push('**Numeros e listas que dependem dessas fontes aparecem vazios ou zerados por FALTA DE LEITURA, nao por ausencia real do dado.**');
+  lines.push('Nao afirme "nao ha X" nem "esta tudo ok" para essas secoes. Diga ao usuario que a coleta falhou e cite o motivo acima.');
+  return lines.join('\n');
+}
 
 const REPORT_NAMES = [
   'whm_account_health_summary',
@@ -59,8 +112,21 @@ function safeUnwrap(result) {
   return result;
 }
 
-async function bestEffort(promise, fallback = null) {
-  try { return await promise; } catch (_) { return fallback; }
+/**
+ * Executa a promise tolerando falha, mas REGISTRANDO-A.
+ * O fallback existe para o relatorio continuar; a falha nunca some.
+ *
+ * @param {Promise} promise - Chamada ao WHM/SSH
+ * @param {any} fallback - Valor neutro quando falha
+ * @param {string} [source] - Rotulo da fonte para o bloco de indisponibilidade
+ */
+async function bestEffort(promise, fallback = null, source = null) {
+  try {
+    return await promise;
+  } catch (error) {
+    recordSourceFailure(source || 'fonte WHM nao identificada', error);
+    return fallback;
+  }
 }
 
 function extractZoneRecords(zoneData) {
@@ -73,21 +139,91 @@ function extractZoneRecords(zoneData) {
   return d?.record || d?.records || [];
 }
 
+/**
+ * Estado dos servicos com fallback em cadeia.
+ *
+ * Devolve `{ services, available }`. `available: false` significa que NAO houve
+ * medicao — e obrigatorio distinguir isso de "medi e nao ha servico parado".
+ * Antes esta funcao devolvia `[]` nos dois casos e o relatorio imprimia uma
+ * secao de servicos criticos vazia, que se le como "esta tudo rodando".
+ */
 async function getServiceStatusWithFallback(ctx) {
   const { whmService, sshManager } = ctx;
   try {
     const res = await whmService.getServiceStatus();
-    return res?.services || [];
+    return { services: res?.services || [], available: true };
   } catch (apiError) {
-    if (sshManager && apiError.message?.includes('Parse Error')) {
+    // O leitor tolerante ja cobre headers malformados; SSH e a ultima rede.
+    if (sshManager) {
       try {
         const sshRes = await sshManager._executeCommand('whmapi1 servicestatus --output=json');
         const parsed = JSON.parse(sshRes.output);
-        return parsed?.data?.service || [];
-      } catch (_) { /* fall through */ }
+        return { services: parsed?.data?.service || [], available: true, via: 'ssh' };
+      } catch (sshError) {
+        recordSourceFailure('servicestatus', `API: ${apiError.message}; SSH: ${sshError.message}`);
+        return { services: [], available: false };
+      }
     }
-    return [];
+    recordSourceFailure('servicestatus', apiError);
+    return { services: [], available: false };
   }
+}
+
+/**
+ * Renderiza a secao de servicos criticos sem inventar diagnostico quando nao
+ * houve leitura.
+ */
+function renderCriticalServices(statusResult) {
+  const CRITICOS = ['httpd', 'mysql', 'mariadb', 'exim', 'named', 'cpsrvd', 'sshd', 'lfd'];
+  const lines = ['## Servicos Criticos'];
+
+  if (!statusResult.available) {
+    lines.push('**NAO MEDIDO** — a leitura do estado dos servicos falhou (ver "FONTES INDISPONIVEIS" no fim).');
+    lines.push('Nao conclua que os servicos estao ativos: nenhum deles foi verificado.');
+    return lines;
+  }
+
+  const encontrados = CRITICOS
+    .map(svc => ({ svc, found: statusResult.services.find(s => (s.name || s.service) === svc) }))
+    .filter(x => x.found);
+
+  if (!encontrados.length) {
+    lines.push('Nenhum dos servicos criticos monitorados foi reportado pelo WHM nesta leitura.');
+    return lines;
+  }
+
+  encontrados.forEach(({ svc, found }) => {
+    const estado = serviceState(found);
+    const sufixo = estado.isRunning === null ? ' (o WHM nao publica estado de execucao para este servico)' : '';
+    lines.push(`- ${svc}: ${estado.label}${sufixo}`);
+  });
+  return lines;
+}
+
+/**
+ * Executa `fn` sobre `items` com concorrencia limitada, preservando a ordem.
+ * Usado para nao serializar N consultas independentes ao WHM (o que estourava
+ * o deadline) nem disparar todas de uma vez contra um servidor sob carga.
+ *
+ * @param {Array} items
+ * @param {number} limit - Maximo de chamadas simultaneas
+ * @param {Function} fn - async (item, index) => resultado
+ * @returns {Promise<Array>} resultados na ordem original
+ */
+async function mapWithConcurrency(items, limit, fn) {
+  const results = new Array(items.length);
+  let cursor = 0;
+
+  const worker = async () => {
+    while (cursor < items.length) {
+      const index = cursor++;
+      results[index] = await fn(items[index], index);
+    }
+  };
+
+  const size = Math.max(1, Math.min(limit, items.length));
+  await Promise.all(Array.from({ length: size }, worker));
+  return results;
 }
 
 function tryFindRecord(records, type, namePattern) {
@@ -104,15 +240,19 @@ async function generateAccountHealthSummary(ctx, args) {
   const { whmService } = ctx;
   const filterSuspended = args?.filter_suspended === true || args?.filter_suspended === 'true';
 
-  const acctsRaw = await bestEffort(whmService.listAccounts(), { data: { acct: [] } });
+  const acctsRaw = await bestEffort(whmService.listAccounts(), null, 'listAccounts');
+  const accountsAvailable = acctsRaw !== null;
   const accounts = acctsRaw?.data?.acct || acctsRaw?.acct || [];
   const filtered = filterSuspended ? accounts.filter(a => a.suspended) : accounts;
 
   const active = accounts.filter(a => !a.suspended).length;
   const suspended = accounts.filter(a => a.suspended).length;
 
-  const allServices = await getServiceStatusWithFallback(ctx);
-  const stopped = allServices.filter(s => !(s.running === 1 || s.running === true));
+  const serviceStatus = await getServiceStatusWithFallback(ctx);
+  const allServices = serviceStatus.services;
+  // Somente servicos MEDIDOS e comprovadamente parados. "Nao monitorado" e
+  // "nao instalado" nao sao parada e nao devem virar alerta.
+  const stopped = allServices.filter(s => serviceState(s).isRunning === false);
   const criticalStopped = stopped.filter(s => ['httpd', 'mysql', 'mariadb', 'exim', 'named', 'cpsrvd'].includes(s.name || s.service));
 
   const overQuota = accounts.filter(a => {
@@ -125,10 +265,17 @@ async function generateAccountHealthSummary(ctx, args) {
   lines.push(`# Saude das Contas — Resumo Executivo${filterSuspended ? ' (apenas suspensas)' : ''}`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
   lines.push(`## Status de Contas`);
-  lines.push(`- Total: **${accounts.length}**`);
-  lines.push(`- Ativas: **${active}**`);
-  lines.push(`- Suspensas: **${suspended}**`);
-  lines.push(`- Acima de 90% de quota: **${overQuota.length}**\n`);
+  if (!accountsAvailable) {
+    // Sem esta guarda, a falha de listAccounts virava "Total: 0" — indistinguivel
+    // de um servidor legitimamente vazio.
+    lines.push('**NAO MEDIDO** — a listagem de contas falhou (ver "FONTES INDISPONIVEIS" no fim).');
+    lines.push('Nao afirme quantidade, nem que nao ha contas acima de quota.\n');
+  } else {
+    lines.push(`- Total: **${accounts.length}**`);
+    lines.push(`- Ativas: **${active}**`);
+    lines.push(`- Suspensas: **${suspended}**`);
+    lines.push(`- Acima de 90% de quota: **${overQuota.length}**\n`);
+  }
 
   if (overQuota.length) {
     lines.push(`### Contas com quota >= 90%`);
@@ -138,15 +285,7 @@ async function generateAccountHealthSummary(ctx, args) {
     lines.push('');
   }
 
-  lines.push(`## Servicos Criticos`);
-  const criticalServices = ['httpd', 'mysql', 'mariadb', 'exim', 'named', 'cpsrvd', 'sshd', 'lfd'];
-  criticalServices.forEach(svc => {
-    const found = allServices.find(s => (s.name || s.service) === svc);
-    if (found) {
-      const ok = found.running === 1 || found.running === true;
-      lines.push(`- ${svc}: ${ok ? 'Ativo' : '**PARADO**'}`);
-    }
-  });
+  lines.push(...renderCriticalServices(serviceStatus));
   if (criticalStopped.length) {
     lines.push(`\n**Atencao:** ${criticalStopped.length} servicos criticos parados — investigar com manage_system_services restart_service`);
   }
@@ -164,11 +303,11 @@ async function generateResourceUsageTrends(ctx, args) {
   const { whmService, sshManager } = ctx;
   const periodDays = args?.period_days || 7;
 
-  const acctsRaw = await bestEffort(whmService.listAccounts(), { data: { acct: [] } });
+  const acctsRaw = await bestEffort(whmService.listAccounts(), { data: { acct: [] } }, 'listAccounts');
   const accounts = acctsRaw?.data?.acct || acctsRaw?.acct || [];
 
   let serverLoad = null;
-  if (sshManager) serverLoad = safeUnwrap(await bestEffort(sshManager.getSystemLoad()));
+  if (sshManager) serverLoad = safeUnwrap(await bestEffort(sshManager.getSystemLoad(), null, 'SSH getSystemLoad'));
 
   const totalUsedMB = accounts.reduce((sum, a) => sum + (Number(String(a.diskused || '0').replace(/M$/, '')) || 0), 0);
   const totalLimitMB = accounts.reduce((sum, a) => {
@@ -300,23 +439,30 @@ async function generateSecurityPosture(ctx, args) {
   const { whmService } = ctx;
   const checkType = args?.check_type || 'all';
 
-  const allServices = await getServiceStatusWithFallback(ctx);
-  const findSvc = name => allServices.find(s => (s.name || s.service) === name);
-
-  const lfd = findSvc('lfd');
-  const ssh = findSvc('sshd');
-  const clamd = findSvc('clamd');
-  const cphulkd = findSvc('cphulkd');
+  const serviceStatus = await getServiceStatusWithFallback(ctx);
+  const findSvc = name => serviceStatus.services.find(s => (s.name || s.service) === name);
 
   const lines = [];
   lines.push(`# Postura de Seguranca`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
 
   lines.push(`## Firewall e Detecção de Intrusao`);
-  lines.push(`- CSF/LFD: ${lfd ? (lfd.running ? 'Ativo' : '**INATIVO**') : 'Nao instalado / nao reportado'}`);
-  lines.push(`- cPHulk (brute-force protection): ${cphulkd ? (cphulkd.running ? 'Ativo' : '**INATIVO**') : 'Nao instalado'}`);
-  lines.push(`- SSH daemon: ${ssh ? (ssh.running ? 'Ativo' : '**INATIVO**') : 'Nao reportado'}`);
-  lines.push(`- ClamAV (antivirus): ${clamd ? (clamd.running ? 'Ativo' : '**INATIVO**') : 'Nao instalado'}`);
+  if (!serviceStatus.available) {
+    // Sem medicao, o texto antigo afirmava "Nao instalado" para CADA defesa —
+    // um falso negativo de seguranca que um modelo repassaria como diagnostico.
+    lines.push('**NAO MEDIDO** — a leitura do estado dos servicos falhou (ver "FONTES INDISPONIVEIS" no fim).');
+    lines.push('Nao conclua que CSF/LFD, cPHulk, SSH ou ClamAV estao ausentes ou inativos: nenhum foi verificado.');
+  } else {
+    const estado = (svc, ausente) => {
+      if (!svc) return ausente;
+      const st = serviceState(svc);
+      return st.isRunning === null ? `${st.label} (estado de execucao nao publicado pelo WHM)` : st.label;
+    };
+    lines.push(`- CSF/LFD: ${estado(findSvc('lfd'), 'Nao instalado / nao reportado')}`);
+    lines.push(`- cPHulk (brute-force protection): ${estado(findSvc('cphulkd'), 'Nao instalado')}`);
+    lines.push(`- SSH daemon: ${estado(findSvc('sshd'), 'Nao reportado')}`);
+    lines.push(`- ClamAV (antivirus): ${estado(findSvc('clamd'), 'Nao instalado')}`);
+  }
   lines.push('');
 
   lines.push(`## Patches e Atualizações`);
@@ -330,9 +476,21 @@ async function generateSecurityPosture(ctx, args) {
   }
 
   lines.push(`## Acoes recomendadas`);
-  if (!lfd?.running) lines.push(`- **Critico**: ativar/instalar CSF/LFD`);
-  if (!cphulkd?.running) lines.push(`- **Alta**: ativar cPHulk em "Security Center" > "cPHulk Brute Force Protection"`);
-  if (!clamd?.running) lines.push(`- **Media**: avaliar instalar ClamAV via WHM > "EasyApache" ou \`yum install clamav\``);
+  if (serviceStatus.available) {
+    // Recomendar "instalar CSF/LFD" sem ter medido seria inventar um achado de
+    // seguranca: o servico pode estar rodando normalmente.
+    const rodando = n => {
+      const s = findSvc(n);
+      if (!s) return false;
+      // Sem medicao nao ha base para recomendar instalar/ativar.
+      return serviceState(s).isRunning !== false;
+    };
+    if (!rodando('lfd')) lines.push(`- **Critico**: ativar/instalar CSF/LFD`);
+    if (!rodando('cphulkd')) lines.push(`- **Alta**: ativar cPHulk em "Security Center" > "cPHulk Brute Force Protection"`);
+    if (!rodando('clamd')) lines.push(`- **Media**: avaliar instalar ClamAV via WHM > "EasyApache" ou \`yum install clamav\``);
+  } else {
+    lines.push(`- Sem leitura dos servicos nesta execucao: NAO ha recomendacao sobre CSF/LFD, cPHulk ou ClamAV. Repita o relatorio quando a coleta voltar.`);
+  }
   lines.push(`- Revisar configuracao TLS minima: TLS 1.2+ obrigatorio, desativar SSLv3/TLS 1.0/1.1`);
   return lines.join('\n');
 }
@@ -346,7 +504,7 @@ async function generateSSLInventory(ctx, args) {
 
   let vhosts = null;
   if (sshManager) {
-    const sshRes = await bestEffort(sshManager._executeCommand('whmapi1 --output=json fetch_ssl_vhosts 2>/dev/null'));
+    const sshRes = await bestEffort(sshManager._executeCommand('whmapi1 --output=json fetch_ssl_vhosts 2>/dev/null'), null, 'fetch_ssl_vhosts (SSH)');
     if (sshRes?.output) {
       try { vhosts = JSON.parse(sshRes.output)?.data?.vhosts; } catch (_) { /* ignore */ }
     }
@@ -432,7 +590,7 @@ async function generateSSLInventory(ctx, args) {
 async function generateBackupCoverage(ctx, args) {
   const { whmService, sshManager } = ctx;
 
-  const acctsRaw = await bestEffort(whmService.listAccounts(), { data: { acct: [] } });
+  const acctsRaw = await bestEffort(whmService.listAccounts(), { data: { acct: [] } }, 'listAccounts');
   const accounts = acctsRaw?.data?.acct || acctsRaw?.acct || [];
 
   const lines = [];
@@ -446,11 +604,11 @@ async function generateBackupCoverage(ctx, args) {
   let jobsData = null;
   let backupsForAccounts = null;
   if (sshManager) {
-    const jobsRes = await bestEffort(sshManager._executeCommand('jetbackup5api -F listBackupJobs -O json 2>/dev/null'));
+    const jobsRes = await bestEffort(sshManager._executeCommand('jetbackup5api -F listBackupJobs -O json 2>/dev/null'), null, 'jetbackup5 listBackupJobs');
     if (jobsRes?.output) {
       try { jobsData = JSON.parse(jobsRes.output); } catch (_) { /* ignore */ }
     }
-    const backupsRes = await bestEffort(sshManager._executeCommand('jetbackup5api -F listBackupForAccounts -O json -D "type=1" 2>/dev/null'));
+    const backupsRes = await bestEffort(sshManager._executeCommand('jetbackup5api -F listBackupForAccounts -O json -D "type=1" 2>/dev/null'), null, 'jetbackup5 listBackupForAccounts');
     if (backupsRes?.output) {
       try { backupsForAccounts = JSON.parse(backupsRes.output); } catch (_) { /* ignore */ }
     }
@@ -503,7 +661,7 @@ async function generateBackupCoverage(ctx, args) {
 
   // Fallback: check /backup legacy + jetbackup local dir
   if (sshManager) {
-    const fallbackRes = await bestEffort(sshManager._executeCommand('ls -lah /home/backups_local_jetbackup 2>/dev/null | head -20; echo "==="; ls /backup 2>/dev/null'));
+    const fallbackRes = await bestEffort(sshManager._executeCommand('ls -lah /home/backups_local_jetbackup 2>/dev/null | head -20; echo "==="; ls /backup 2>/dev/null'), null, 'listagem de backups em disco (SSH)');
     if (fallbackRes?.output && !jobsData) {
       lines.push(`## Inspecao manual de diretorios`);
       lines.push('```');
@@ -522,7 +680,7 @@ async function generateBackupCoverage(ctx, args) {
 async function generateDnsZoneHealth(ctx, args) {
   const { whmService } = ctx;
 
-  const zonesRaw = await bestEffort(whmService.listZones(), null);
+  const zonesRaw = await bestEffort(whmService.listZones(), null, 'listZones');
   const zones = zonesRaw?.data?.zone || zonesRaw?.zone || [];
   const sample = zones.slice(0, 10);
 
@@ -530,14 +688,34 @@ async function generateDnsZoneHealth(ctx, args) {
   lines.push(`# Saude das Zonas DNS`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
   lines.push(`## Resumo`);
-  lines.push(`- Total de zonas: **${zones.length}**\n`);
 
+  if (zonesRaw === null) {
+    // "Total de zonas: 0" para uma listagem que falhou faria um modelo dizer
+    // ao cliente que o servidor nao tem zonas DNS.
+    lines.push('**NAO MEDIDO** — a listagem de zonas falhou (ver "FONTES INDISPONIVEIS" no fim).');
+    lines.push('Nao afirme que nao existem zonas DNS neste servidor.');
+    return lines.join('\n');
+  }
+
+  lines.push(`- Total de zonas: **${zones.length}**\n`);
   if (sample.length === 0) return lines.join('\n');
 
-  lines.push(`## Analise de ${sample.length} zonas (amostra)`);
-  for (const zone of sample) {
+  // Antes: 10 chamadas getZone em SERIE. Com o WHM lento isso encostava no
+  // deadline e o relatorio inteiro morria por timeout. Concorrencia limitada
+  // mantem a latencia baixa sem martelar o servidor.
+  const zoneResults = await mapWithConcurrency(sample, 4, async (zone) => {
     const zoneName = zone.domain || zone.zone || zone;
-    const zoneData = await bestEffort(whmService.getZone(zoneName), null);
+    const zoneData = await bestEffort(whmService.getZone(zoneName), null, `getZone(${zoneName})`);
+    return { zoneName, zoneData, failed: zoneData === null };
+  });
+
+  lines.push(`## Analise de ${sample.length} zonas (amostra)`);
+  for (const { zoneName, zoneData, failed } of zoneResults) {
+    if (failed) {
+      // Zona ilegivel nao pode virar "sem SPF/DKIM/DMARC".
+      lines.push(`- \`${zoneName}\` — **leitura falhou**, checagens nao realizadas`);
+      continue;
+    }
     const records = extractZoneRecords(zoneData);
 
     const hasA = records.some(r => String(r.type).toUpperCase() === 'A');
@@ -573,7 +751,7 @@ async function generateEmailDeliverability(ctx, args) {
     return lines.join('\n');
   }
 
-  const zoneData = await bestEffort(whmService.getZone(domain), null);
+  const zoneData = await bestEffort(whmService.getZone(domain), null, `getZone(${domain})`);
   const records = extractZoneRecords(zoneData);
 
   const mxRecords = records.filter(r => String(r.type).toUpperCase() === 'MX');
@@ -623,13 +801,13 @@ async function generateAccountQuickLookup(ctx, args) {
 
   // Try direct username match first
   let acct = null;
-  const directSummary = await bestEffort(whmService.getAccountSummary(searchTerm), null);
+  const directSummary = await bestEffort(whmService.getAccountSummary(searchTerm), null, `getAccountSummary(${searchTerm})`);
   if (directSummary?.data?.user || directSummary?.data?.domain) {
     acct = directSummary.data;
   }
   // Fallback: substring search by username/domain/owner via listAccounts
   if (!acct) {
-    const all = await bestEffort(whmService.listAccounts(), { data: { acct: [] } });
+    const all = await bestEffort(whmService.listAccounts(), { data: { acct: [] } }, 'listAccounts');
     const accounts = all?.data?.acct || all?.acct || [];
     const re = new RegExp(searchTerm, 'i');
     acct = accounts.find(a => re.test(a.user || '') || re.test(a.domain || '') || re.test(a.owner || ''));
@@ -641,7 +819,7 @@ async function generateAccountQuickLookup(ctx, args) {
     return lines.join('\n');
   }
 
-  const domains = await bestEffort(whmService.listDomains(acct.user, 100, 0), { data: [] });
+  const domains = await bestEffort(whmService.listDomains(acct.user, 100, 0), { data: [] }, `listDomains(${acct.user})`);
   const domList = domains?.data || [];
   const counts = domList.reduce((acc, d) => { acc[d.type || 'unknown'] = (acc[d.type || 'unknown'] || 0) + 1; return acc; }, {});
 
@@ -675,7 +853,7 @@ async function generateDnsTroubleshooting(ctx, args) {
     return lines.join('\n');
   }
 
-  const auth = await bestEffort(whmService.hasLocalAuthority(domain), null);
+  const auth = await bestEffort(whmService.hasLocalAuthority(domain), null, `hasLocalAuthority(${domain})`);
   const authData = auth?.data || auth;
   const isLocal = authData?.is_authoritative ?? authData?.authoritative ?? (authData?.type === 'local' || authData?.type === 'master');
 
@@ -686,7 +864,7 @@ async function generateDnsTroubleshooting(ctx, args) {
     return lines.join('\n');
   }
 
-  const zoneData = await bestEffort(whmService.getZone(domain), null);
+  const zoneData = await bestEffort(whmService.getZone(domain), null, `getZone(${domain})`);
   const records = extractZoneRecords(zoneData);
 
   const aRec = tryFindRecord(records, 'A', new RegExp(`^${domain.replace(/\./g, '\\.')}\\.$`));
@@ -718,11 +896,16 @@ async function generateDnsTroubleshooting(ctx, args) {
 }
 
 async function generateEmailSetupGuide(ctx, args) {
+  const informado = Boolean(args?.domain || args?.email_address);
   const domain = args?.domain || args?.email_address?.split('@')?.[1] || 'seudominio.com.br';
   const email = args?.email_address || `usuario@${domain}`;
   const lines = [];
   lines.push(`# Guia de Configuracao de Email`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
+  if (!informado) {
+    lines.push(`> **MODELO GENERICO** — nenhum dominio foi informado, entao \`${domain}\` e um exemplo, NAO o dominio do cliente.`);
+    lines.push(`> Nao apresente estes valores como a configuracao real. Chame de novo com \`arguments: { "domain": "<dominio real>" }\`.\n`);
+  }
   lines.push(`## Conta de exemplo: \`${email}\`\n`);
   lines.push(`## IMAP (recomendado — sincroniza pastas)`);
   lines.push(`- Servidor: \`mail.${domain}\``);
@@ -747,6 +930,9 @@ async function generateSslInstallationGuide(ctx, args) {
   const lines = [];
   lines.push(`# Guia de Instalacao SSL/HTTPS`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
+  if (!args?.domain) {
+    lines.push(`> **MODELO GENERICO** — \`${domain}\` e exemplo, NAO o dominio do cliente. Chame com \`arguments: { "domain": "<dominio real>" }\` para personalizar.\n`);
+  }
   lines.push(`## Cenario A — AutoSSL (gratuito, automatico)`);
   lines.push(`1. WHM > SSL/TLS > Manage AutoSSL`);
   lines.push(`2. Ativar provedor (cPanel ou Let's Encrypt)`);
@@ -783,43 +969,49 @@ async function generateWebsiteDownInvestigation(ctx, args) {
   lines.push(`## Dominio: \`${domain}\`\n`);
 
   // 1. DNS
-  const auth = await bestEffort(whmService.hasLocalAuthority(domain), null);
+  const auth = await bestEffort(whmService.hasLocalAuthority(domain), null, `hasLocalAuthority(${domain})`);
   const authData = auth?.data || auth;
   const isLocal = authData?.is_authoritative ?? authData?.authoritative ?? (authData?.type === 'local' || authData?.type === 'master');
   lines.push(`### 1. DNS`);
   lines.push(`- Autoritativo aqui: ${isLocal ? 'Sim' : 'Nao'}`);
   if (isLocal) {
-    const zone = await bestEffort(whmService.getZone(domain), null);
+    const zone = await bestEffort(whmService.getZone(domain), null, `getZone(${domain})`);
     const records = extractZoneRecords(zone);
     const aRec = tryFindRecord(records, 'A', new RegExp(`^${domain.replace(/\./g, '\\.')}\\.$`));
     lines.push(`- Registro A apex: ${aRec ? (aRec.address || aRec.data) : '**AUSENTE**'}`);
   }
 
   // 2. Owner
-  const owner = await bestEffort(whmService.getDomainOwner(domain), null);
+  const owner = await bestEffort(whmService.getDomainOwner(domain), null, `getDomainOwner(${domain})`);
   const ownerData = owner?.data || owner;
   const username = ownerData?.user || ownerData?.owner;
   lines.push(`\n### 2. Proprietario`);
   lines.push(`- Username cPanel: ${username || 'desconhecido'}`);
   if (username) {
-    const acct = await bestEffort(whmService.getAccountSummary(username), null);
+    const acct = await bestEffort(whmService.getAccountSummary(username), null, `getAccountSummary(${username})`);
     const a = acct?.data;
     if (a) lines.push(`- Status conta: ${a.suspended ? `**Suspensa** (${a.suspendreason || 'sem motivo'})` : 'Ativa'}`);
   }
 
   // 3. Servicos
-  const allServices = await getServiceStatusWithFallback(ctx);
-  const httpd = allServices.find(s => (s.name || s.service) === 'httpd');
-  const apache_php_fpm = allServices.find(s => (s.name || s.service) === 'apache_php_fpm');
-  const mysql = allServices.find(s => (s.name || s.service) === 'mysql');
+  const serviceStatus = await getServiceStatusWithFallback(ctx);
   lines.push(`\n### 3. Servicos do servidor`);
-  lines.push(`- Apache (httpd): ${httpd ? (httpd.running ? 'Ativo' : '**PARADO**') : 'desconhecido'}`);
-  lines.push(`- apache_php_fpm: ${apache_php_fpm ? (apache_php_fpm.running ? 'Ativo' : '**PARADO**') : 'desconhecido'}`);
-  lines.push(`- MySQL/MariaDB: ${mysql ? (mysql.running ? 'Ativo' : '**PARADO**') : 'desconhecido'}`);
+  if (!serviceStatus.available) {
+    // Investigacao de site fora do ar: dizer "desconhecido" para tudo sem
+    // explicar levava a descartar a hipotese mais provavel (servico parado).
+    lines.push('**NAO MEDIDO** — a leitura dos servicos falhou (ver "FONTES INDISPONIVEIS" no fim).');
+    lines.push('Servico parado continua sendo hipotese ABERTA para este site fora do ar — verifique manualmente antes de descartar.');
+  } else {
+    const find = n => serviceStatus.services.find(s => (s.name || s.service) === n);
+    const estado = svc => svc ? serviceState(svc).label : 'nao reportado pelo WHM';
+    lines.push(`- Apache (httpd): ${estado(find('httpd'))}`);
+    lines.push(`- apache_php_fpm: ${estado(find('apache_php_fpm'))}`);
+    lines.push(`- MySQL/MariaDB: ${estado(find('mysql'))}`);
+  }
 
   // 4. Carga
   if (sshManager) {
-    const load = safeUnwrap(await bestEffort(sshManager.getSystemLoad()));
+    const load = safeUnwrap(await bestEffort(sshManager.getSystemLoad(), null, 'SSH getSystemLoad'));
     if (load) {
       lines.push(`\n### 4. Carga do servidor`);
       lines.push(`- Load 1m: ${load.loadavg?.[0]} | 5m: ${load.loadavg?.[1]} | 15m: ${load.loadavg?.[2]}`);
@@ -846,7 +1038,7 @@ async function generateDiskUsageAlert(ctx, args) {
     return lines.join('\n');
   }
 
-  const summary = await bestEffort(whmService.getAccountSummary(username), null);
+  const summary = await bestEffort(whmService.getAccountSummary(username), null, `getAccountSummary(${username})`);
   const a = summary?.data;
   if (!a) {
     lines.push(`Conta \`${username}\` nao encontrada.`);
@@ -858,14 +1050,14 @@ async function generateDiskUsageAlert(ctx, args) {
 
   // Top dirs via SSH
   if (sshManager) {
-    const duRes = await bestEffort(sshManager._executeCommand(`du -sh /home/${a.user}/* 2>/dev/null | sort -rh | head -15`));
+    const duRes = await bestEffort(sshManager._executeCommand(`du -sh /home/${a.user}/* 2>/dev/null | sort -rh | head -15`), null, `du /home/${a.user} (SSH)`);
     if (duRes?.output) {
       lines.push(`## Top 15 diretorios no home`);
       lines.push('```');
       lines.push(duRes.output.trim());
       lines.push('```');
     }
-    const mailRes = await bestEffort(sshManager._executeCommand(`du -sh /home/${a.user}/mail/* 2>/dev/null | sort -rh | head -10`));
+    const mailRes = await bestEffort(sshManager._executeCommand(`du -sh /home/${a.user}/mail/* 2>/dev/null | sort -rh | head -10`), null, `du /home/${a.user}/mail (SSH)`);
     if (mailRes?.output && mailRes.output.trim()) {
       lines.push(`\n## Top caixas de email`);
       lines.push('```');
@@ -890,6 +1082,9 @@ async function generateDomainMigrationChecklist(ctx, args) {
   const lines = [];
   lines.push(`# Checklist de Migracao de Dominio`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
+  if (!args?.domain_from && !args?.domain_to) {
+    lines.push(`> **MODELO GENERICO** — \`${domainFrom}\`/\`${domainTo}\` sao exemplos, NAO dominios do cliente. Passe \`domain_from\` e \`domain_to\` para personalizar.\n`);
+  }
   lines.push(`## De: \`${domainFrom}\` Para: \`${domainTo}\` (ou mesmo dominio, novo servidor)\n`);
   lines.push(`### Pre-migracao`);
   lines.push(`- [ ] Inventariar dominios, subdominios, addons (search_hosted_domains)`);
@@ -921,6 +1116,9 @@ async function generateBackupRestoreGuide(ctx, args) {
   const lines = [];
   lines.push(`# Guia de Restauracao de Backup`);
   lines.push(`_Gerado: ${nowUTC()}_\n`);
+  if (!args?.account_name && !args?.username) {
+    lines.push(`> **MODELO GENERICO** — \`${account}\` e um marcador, NAO uma conta existente. Passe \`account_name\` para personalizar o guia.\n`);
+  }
   lines.push(`## Alvo: conta \`${account}\` | Backup: \`${backupDate}\`\n`);
   lines.push(`### Metodo 1 — WHM Restore Backup UI (recomendado)`);
   lines.push(`1. WHM > Backup > Restore Backups`);
@@ -970,7 +1168,24 @@ const REPORT_REGISTRY = {
 async function generateReport(name, ctx, args = {}) {
   const fn = REPORT_REGISTRY[name];
   if (!fn) throw new Error(`Relatorio desconhecido: ${name}. Nomes validos: ${REPORT_NAMES.join(', ')}`);
-  return await fn(ctx, args);
+
+  // Escopo de coleta de falhas por execucao: qualquer bestEffort/fallback que
+  // falhar dentro daqui e anexado ao fim do Markdown. Centralizado para que os
+  // 15 relatorios sejam cobertos sem depender de cada autor lembrar.
+  return await failureStore.run({ failures: [] }, async () => {
+    const markdown = await fn(ctx, args);
+    return markdown + renderSourceFailures();
+  });
 }
 
-module.exports = { REPORT_NAMES, REPORT_REGISTRY, generateReport };
+module.exports = {
+  REPORT_NAMES,
+  REPORT_REGISTRY,
+  generateReport,
+  // Exportados para teste
+  bestEffort,
+  mapWithConcurrency,
+  renderSourceFailures,
+  recordSourceFailure,
+  failureStore
+};
