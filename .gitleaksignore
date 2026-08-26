@@ -1,0 +1,13 @@
+# Excecoes do gitleaks, uma por linha, no formato commit:arquivo:regra:linha.
+#
+# O valor abaixo e a API key FALSA do bloco de mocks de tests/server.test.js.
+# Ele diz "naoehsecreto" em portugues claro e ainda assim casa com a regra
+# generic-api-key, que e sintatica: qualquer string longa depois do prefixo
+# sk_ dispara, independente do que ela signifique. O teste precisa de um valor
+# que passe na validacao de formato do auth.js (^sk_whm_mcp_[a-z]+_[a-z0-9]{8,}$),
+# entao nao da para usar "<SEU_TOKEN>" ali.
+#
+# O CI deste repo usa TruffleHog com --only-verified e nao reporta isto, porque
+# nao ha API contra a qual verificar. Esta lista existe para as varreduras
+# manuais com gitleaks nao acusarem o mesmo falso positivo a cada rodada.
+tests/server.test.js:generic-api-key:10

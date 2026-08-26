@@ -5,7 +5,9 @@
 
 // IMPORTANTE: Mock das variaveis ANTES de qualquer require
 process.env.NODE_ENV = 'test';
-process.env.WHM_MCP_API_KEY = 'sk_whm_mcp_test_abcd1234efgh5678';
+// Valor deliberadamente auto-explicativo: o anterior parecia aleatorio e o
+// scanner de segredo o acusava a cada varredura do repositorio, que e publico.
+process.env.WHM_MCP_API_KEY = 'sk_whm_mcp_test_naoehsecreto123';
 process.env.WHM_HOST = 'test.whm.local';
 process.env.WHM_PORT = '2087';
 process.env.WHM_USERNAME = 'root';

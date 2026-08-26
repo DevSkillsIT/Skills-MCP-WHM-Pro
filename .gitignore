@@ -64,3 +64,11 @@ Fluxo-Dev-SkillsIT/
 # `*.bak` nao casa com sufixo (ex: safety-guard.js.bak-bug8) — 2026-08-12
 *.bak-*
 *.bak.*
+
+# Exigidos pelo gate de .gitignore do workflow de deteccao de segredos.
+# Barra no FIM e nao no inicio: casa o diretorio em QUALQUER nivel, nao so na
+# raiz. Validado por `git check-ignore -v`, e nao pela presenca do texto — o
+# proprio gate do workflow so faz `grep -q`, e no monorepo isso deixou passar
+# um `secrets/` que nao ignorava nada.
+secrets/
+credentials/
