@@ -371,9 +371,18 @@ async function generateResourceUsageTrends(ctx, args) {
   }
 
   const lines = [];
-  lines.push(`# Tendencias de Uso de Recursos (janela: ${periodDays} dias)`);
+  // O titulo NAO pode anunciar uma janela de N dias: nao existe medicao de N
+  // dias. O WHM entrega apenas o retrato atual, e a taxa e derivada da vida
+  // inteira da conta. Cabecalho deve nomear a cobertura REAL.
+  lines.push(`# Uso de Recursos — Retrato Atual + Projecao de Longo Prazo`);
   lines.push(`_Gerado: ${nowUTC()}_`);
-  lines.push(`_Nota: WHM nao armazena historico nativo. Projecoes usam (uso_atual / dias_desde_criacao) como taxa media; sao estimativa de longo prazo, nao mede crescimento da semana._\n`);
+  lines.push(`_Nota: WHM nao armazena historico nativo. Este relatorio e um RETRATO DO MOMENTO. As projecoes usam (uso_atual / dias_desde_criacao) como taxa media da vida inteira da conta — NAO medem crescimento da ultima semana nem de qualquer janela._`);
+  if (args?.period_days) {
+    // O parametro era aceito e ecoado no titulo sem entrar em nenhum calculo:
+    // period_days=7 e period_days=90 produziam corpo byte-a-byte identico.
+    lines.push(`\n> **\`period_days=${periodDays}\` NAO altera nenhum numero abaixo.** Nao ha serie historica para recortar; o parametro e aceito por compatibilidade e ignorado. Nao descreva estes dados como "os ultimos ${periodDays} dias".`);
+  }
+  lines.push('');
 
   lines.push(`## Disco`);
   lines.push(`- Uso total alocado pelas contas: **${humanizeBytes(totalUsedMB * 1024 * 1024)}** / **${humanizeBytes(totalLimitMB * 1024 * 1024)}** (planos somados)`);
@@ -431,7 +440,8 @@ async function generateResourceUsageTrends(ctx, args) {
   lines.push(`## Limitacoes da projecao`);
   lines.push(`- A taxa media e calculada como \`uso_atual / dias_desde_criacao\` — uniforme ao longo da vida da conta.`);
   lines.push(`- Crescimento real e raramente linear; sites em fase ativa de uploads/backups crescem muito mais rapido.`);
-  lines.push(`- Para projecao real semana-a-semana, precisaria armazenar snapshots historicos (cron + storage local), o que nao esta no escopo do WHM nativo.`);
+  lines.push(`- **Nao ha historico observado.** Uma projecao semana-a-semana de verdade exigiria snapshots datados coletados periodicamente (cron + storage local), fora do que o WHM nativo oferece. Sem isso, qualquer "tendencia" aqui e extrapolacao de um unico ponto no tempo.`);
+  lines.push(`- Ao reportar ao usuario: diga "uso atual e projecao de longo prazo", nunca "crescimento da semana" ou "tendencia dos ultimos N dias".`);
   return lines.join('\n');
 }
 

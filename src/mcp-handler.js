@@ -468,7 +468,7 @@ const utilityToolDefs = [
         },
         arguments: {
           type: 'object',
-          description: 'Argumentos do relatorio: username, domain, account_name, search_term, filter_suspended, period_days, check_type, expiring_days, domain_from, domain_to, backup_date, email_address.',
+          description: 'Argumentos do relatorio: username, domain, account_name, search_term, filter_suspended, check_type, expiring_days, domain_from, domain_to, backup_date, email_address. ATENCAO: period_days e aceito por compatibilidade mas NAO recorta periodo algum — o WHM nao expoe historico, entao todo relatorio e um retrato do momento.',
           additionalProperties: true
         }
       },
@@ -636,7 +636,7 @@ class MCPHandler {
     const { REPORT_NAMES } = require('./lib/reports');
     const PROMPT_META = {
       whm_account_health_summary: { desc: 'Resumo executivo de saude das contas WHM (ativas/suspensas/over-quota/servicos criticos).', args: [{ name: 'filter_suspended', required: false }] },
-      whm_resource_usage_trends: { desc: 'Tendencias de uso de disco/CPU/memoria + projecao linear de ETA ate 90% da quota.', args: [{ name: 'period_days', required: false }] },
+      whm_resource_usage_trends: { desc: 'Uso ATUAL de disco/CPU/memoria + projecao linear de ETA ate 90% da quota. Nao ha historico: nao descreva o resultado como crescimento de um periodo.', args: [{ name: 'period_days', required: false }] },
       whm_security_posture: { desc: 'Postura de seguranca (CSF/LFD, cPHulk, SSH, ClamAV) com acoes recomendadas.', args: [{ name: 'check_type', required: false }] },
       whm_ssl_certificate_inventory: { desc: 'Inventario de certificados SSL instalados com alerta de expiracao.', args: [] },
       whm_backup_coverage: { desc: 'Cobertura de backups (JetBackup5 ou /backup) com identificacao de gaps.', args: [] },

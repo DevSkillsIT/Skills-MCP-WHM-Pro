@@ -194,6 +194,38 @@ describe('Lei de nao-mascaramento nos relatorios', () => {
     });
   });
 
+  describe('whm_resource_usage_trends: cabecalho nao pode prometer janela inexistente', () => {
+    // Regressao: o titulo dizia "(janela: N dias)" e period_days era ecoado sem
+    // entrar em calculo algum — period_days=7 e =90 davam corpo identico. Um
+    // modelo fraco descrevia isso como "crescimento dos ultimos N dias".
+    const ctx = {
+      whmService: {
+        listAccounts: () => Promise.resolve({ data: { acct: [
+          { user: 'c1', domain: 'a.com', diskused: '100M', disklimit: '1000M', startdate_epoch: 1600000000 }
+        ] } })
+      },
+      sshManager: null
+    };
+
+    it('nao anuncia janela de N dias no titulo', async () => {
+      const md = await generateReport('whm_resource_usage_trends', ctx, { period_days: 7 });
+      expect(md.split('\n')[0]).not.toMatch(/janela:\s*\d+\s*dias/);
+      expect(md).toMatch(/RETRATO DO MOMENTO/);
+    });
+
+    it('avisa explicitamente que period_days nao altera os numeros', async () => {
+      const md = await generateReport('whm_resource_usage_trends', ctx, { period_days: 90 });
+      expect(md).toContain('NAO altera nenhum numero');
+    });
+
+    it('produz o mesmo corpo para qualquer period_days (prova de inercia)', async () => {
+      const norm = t => t.split('\n').filter(l => !/Gerado:|period_days=/.test(l)).join('\n');
+      const a = await generateReport('whm_resource_usage_trends', ctx, { period_days: 7 });
+      const b = await generateReport('whm_resource_usage_trends', ctx, { period_days: 90 });
+      expect(norm(a)).toBe(norm(b));
+    });
+  });
+
   describe('mapWithConcurrency', () => {
     it('preserva a ordem dos resultados', async () => {
       const itens = [5, 1, 4, 2, 3];
